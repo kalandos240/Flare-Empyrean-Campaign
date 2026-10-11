@@ -10,6 +10,21 @@ that touch gameplay, all assets, and saving work on ARM devices.
 Please test the debug APK on a physical Android phone and record its model,
 Android version and reproducible issues in a GitHub issue.
 
+## Verified CI evidence (2026-10-11)
+
+- [ARM release/debug build #38157326908](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38157326908) — successful APK and AAB packaging.
+- [x86_64 Android emulator smoke #38157366384](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38157366384) — successful. On Android API 30, the actual Flare engine logs
+  `Active mods: default, fantasycore (1.15.01), empyrean_campaign (1.15.01)`
+  and remains running with the SDL game activity.
+- Emulator screenshot in the workflow's `flare-emulator-diagnostics` artifact shows
+  the fully rendered original title screen, artwork, and **Russian** menu labels.
+- The engine logs an app-owned config path:
+  `/storage/emulated/0/Android/data/com.kalandos240.flareempyrean/files/config/flare-game/`
+  and separate `userdata/` and game data paths.
+- **Still unverified:** tapping through character creation, movement/combat,
+  device audio, save/reload, ARM device performance, or store installation.
+  A successful launch smoke does not certify these interactions.
+
 ## First launch and filesystem
 
 - [ ] Start with a clean installation. Confirm that the Russian progress screen
