@@ -30,6 +30,12 @@ Android version and reproducible issues in a GitHub issue.
 - In that run, Android Home triggered the engine's original `SDL_WINDOWEVENT_MINIMIZED` save handler, which wrote **userdata/saves/empyrean/1/avatar.txt**. The emulator-only in-app QA receiver verified the real avatar bytes remained identical after the app was force-stopped and relaunched. Custom settings and simulated sentinel also survived.
 - **Still unverified:** moving/combat with touch controls, character loading through the original Load menu, device audio, real ARM-device performance, and installation from the RuStore client. Android emulator save persistence is verified, but full game progress regression tests remain to be written.
 
+## Saved-character reload evidence (2026-10-12)
+
+- [Android emulator load regression #38179244218](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38179244218) **passed**: the actual `userdata/saves/empyrean/1/avatar.txt` survives force-stop/relaunch; touching **Играть** opens the original Russian saved-game menu; touching **Загрузить игру** calls native `SaveLoad::loadGame()` and renders the original **Прибытие** map again.
+- The diagnostic screenshot `flare-loaded-gameplay.png` also shows the original Flare touch-control circles at the bottom left/right after the map loads. Joystick movement is being checked separately and is **not yet certified**.
+- The first test failure [#38178363395](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38178363395) was a QA coordinate miss above the Load button. Fixed by measuring the real button in the screenshot; the later test above passed.
+
 ## First launch and filesystem
 
 - [ ] Start with a clean installation. Confirm that the Russian progress screen
