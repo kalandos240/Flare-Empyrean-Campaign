@@ -89,7 +89,9 @@ public final class LaunchActivity extends Activity {
 
         File marker = new File(root, ".installed-" + DATA_VERSION);
         File mods = new File(root, "mods");
+        // A crash during marker creation must not masquerade as a full install.
         if (marker.isFile()
+                && marker.length() == DATA_VERSION.length()
                 && new File(mods, "mods.txt").isFile()
                 && new File(mods, "game.txt").isFile()
                 && new File(mods, "default").isDirectory()
@@ -179,9 +181,13 @@ public final class LaunchActivity extends Activity {
 
         reportProgress(totalFiles, totalFiles);
         // Never write to the saved-game directories.
-        try (FileOutputStream output = new FileOutputStream(marker)) {
+        File temporaryMarker = new File(root, marker.getName() + ".pending");
+        try (FileOutputStream output = new FileOutputStream(temporaryMarker)) {
             output.write(DATA_VERSION.getBytes("UTF-8"));
             output.getFD().sync();
+        }
+        if (!temporaryMarker.renameTo(marker)) {
+            throw new IOException("Не удалось завершить установку игровых файлов");
         }
     }
 }
