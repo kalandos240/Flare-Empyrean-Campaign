@@ -25,9 +25,10 @@ Android version and reproducible issues in a GitHub issue.
 - [Android emulator character creation #38159434369](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38159434369) — confirmed touchscreen **Play** and **Create** pressed, with original Russian character creation and illustrated Empyrean opening backstory displayed. Its later file-inspection step failed due Android 11 ADB scoped-storage restrictions, not a reported native engine crash.
 - The screenshot originally named `flare-gameplay.png` in this run is an **intro cutscene** (floating Empyrean city), *not* proof that the playable map is ready. The current emulator test now skips the backstory and captures a separate map screenshot.
 - Emulator-only tests use a temporary exported `QaReceiver` to inspect files through the app's own UID. This receiver is **not** included in the RuStore APK or AAB.
-- **Still unverified:** completing the intro into an interactive map, movement/combat,
-  real avatar save/reload, device audio, ARM device performance, or store installation.
-  A successful build or opening UI smoke check does not certify these interactions.
+- [RuStore ARM debug APK and release AAB #38160493213](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38160493213) — **passed** with the current release-preparation code.
+- [Android 11 emulator full campaign start #38160493210](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38160493210) — **passed**: touchscreen Play > character Create, all 8 pages of original introductory cutscene, then actual opening map **Прибытие** with original Russian dialogue, health/mana bars, minimap and inventory/skill toolbar. This is confirmed by the original gameplay screenshot in the `flare-emulator-diagnostics` artifact.
+- In that run, Android Home triggered the engine's original `SDL_WINDOWEVENT_MINIMIZED` save handler, which wrote **userdata/saves/empyrean/1/avatar.txt**. The emulator-only in-app QA receiver verified the real avatar bytes remained identical after the app was force-stopped and relaunched. Custom settings and simulated sentinel also survived.
+- **Still unverified:** moving/combat with touch controls, character loading through the original Load menu, device audio, real ARM-device performance, and installation from the RuStore client. Android emulator save persistence is verified, but full game progress regression tests remain to be written.
 
 ## First launch and filesystem
 
