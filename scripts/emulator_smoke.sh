@@ -63,7 +63,7 @@ TITLE_SCREEN="$DIAGNOSTICS/flare-native-start.png"
 CHARACTER_SCREEN="$DIAGNOSTICS/flare-character-creation.png"
 adb exec-out screencap -p > "$TITLE_SCREEN"
 
-read -r tap_x tap_y < <(python - "$TITLE_SCREEN" <<'PY'
+read -r tap_x tap_y create_x create_y < <(python - "$TITLE_SCREEN" <<'PY'
 import struct
 import sys
 with open(sys.argv[1], "rb") as png:
@@ -71,7 +71,8 @@ with open(sys.argv[1], "rb") as png:
 if header[:8] != b"\x89PNG\r\n\x1a\n":
     raise SystemExit("Android screenshot is not PNG")
 width, height = struct.unpack(">II", header[16:24])
-print(round(width * 0.607), round(height * 0.725))
+print(round(width * 0.607), round(height * 0.725),
+      round(width * 0.337), round(height * 0.91))
 PY
 )
 echo "Touching Flare Play button at $tap_x, $tap_y"
@@ -100,25 +101,53 @@ fi
 python scripts/assert_screen_change.py "$TITLE_SCREEN" "$CHARACTER_SCREEN"
 adb shell pidof "$PACKAGE" >/dev/null
 
+# Original character creation pre-fills a valid random name and class.
+# The Create button is at roughly 33.7%, 91% of the same Pixel 5 screenshot.
+echo "Touching character Create at $create_x, $create_y"
+adb shell input touchscreen tap "$create_x" "$create_y"
+gameplay_constructed=0
+for attempt in $(seq 1 45); do
+  sleep 3
+  adb logcat -d -v time > "$LOGFILE"
+  if grep -q 'FlarePort QA: gameplay state constructed' "$LOGFILE" \
+      && grep -q 'FlarePort QA: create character pressed' "$LOGFILE"; then
+    gameplay_constructed=1
+    break
+  fi
+  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+    echo 'Game crashed during new-character creation.' >&2
+    exit 1
+  fi
+done
+adb exec-out screencap -p > "$DIAGNOSTICS/flare-gameplay.png"
+if [[ "$gameplay_constructed" != 1 ]]; then
+  echo 'Character Create touch did not construct a gameplay state.' >&2
+  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -80 >&2 || true
+  exit 1
+fi
+echo 'Character Create opened the original gameplay state.'
+
 # Confirm the installed campaign and Russian touchscreen settings.
 DATA="/sdcard/Android/data/$PACKAGE/files"
-adb shell "test -f '$DATA/mods/mods.txt' && test -d '$DATA/mods/empyrean_campaign'"
-adb shell "test -d '$DATA/userdata/saves'"
+echo "Verifying app-owned resources using the debug build's app UID"
+adb shell "run-as $PACKAGE ls -ld '$DATA' '$DATA/config/flare-game' '$DATA/userdata/saves'"
+adb shell "run-as $PACKAGE test -f '$DATA/mods/mods.txt' && test -d '$DATA/mods/empyrean_campaign'"
+adb shell "run-as $PACKAGE test -d '$DATA/userdata/saves'"
 adb shell "test -f '$DATA/config/flare-game/settings.txt'"
-adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
+adb shell "run-as $PACKAGE cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
 adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
 
 # Verify that application-owned save files and custom settings survive a relaunch.
 # This sentinel is strictly limited to the disposable emulator.
 SAVES_SENTINEL="$DATA/userdata/saves/.flare-ci-persistence-test"
-adb shell "printf 'test-save-2026' > '$SAVES_SENTINEL'"
-adb shell "sed -i '/^pause_on_focus_loss=/d' '$DATA/config/flare-game/settings.txt'"
-adb shell "printf '\\npause_on_focus_loss=0\\n' >> '$DATA/config/flare-game/settings.txt'"
+adb shell "run-as $PACKAGE sh -c 'echo test-save-2026 > $SAVES_SENTINEL'"
+adb shell "run-as $PACKAGE sed -i '/^pause_on_focus_loss=/d' '$DATA/config/flare-game/settings.txt'"
+adb shell "run-as $PACKAGE sh -c 'echo pause_on_focus_loss=0 >> $DATA/config/flare-game/settings.txt'"
 
 # A second launch must not re-extract the campaign or reset user data.
 MARKER="$DATA/.installed-empyrean-2026-10-11-v2"
 adb shell "test -f '$MARKER'"
-MARKER_BEFORE="$(adb shell stat -c '%Y' "$MARKER" | tr -d '\r')"
+MARKER_BEFORE="$(adb shell run-as "$PACKAGE" stat -c '%Y' "$MARKER" | tr -d '\r')"
 adb shell am force-stop "$PACKAGE"
 adb shell am start -W -n "$PACKAGE/$ACTIVITY"
 sleep 20
