@@ -118,7 +118,8 @@ gameplay_open=0
 for attempt in $(seq 1 35); do
   sleep 3
   adb logcat -d -v time > "$LOGFILE"
-  if grep -q 'FlarePort QA: gameplay state constructed' "$LOGFILE"; then
+  if grep -q 'FlarePort QA: gameplay state constructed' "$LOGFILE" \
+      && grep -q 'FlarePort QA: create character pressed' "$LOGFILE"; then
     gameplay_open=1
     break
   fi
@@ -137,32 +138,6 @@ adb exec-out screencap -p > "$DIAGNOSTICS/flare-gameplay.png"
 adb shell pidof "$PACKAGE" >/dev/null
 echo 'Original character created and native gameplay state constructed.'
 
-
-# Original character creation pre-fills a valid random name and class.
-# The Create button is at roughly 33.7%, 91% of the same Pixel 5 screenshot.
-echo "Touching character Create at $create_x, $create_y"
-adb shell input touchscreen tap "$create_x" "$create_y"
-gameplay_constructed=0
-for attempt in $(seq 1 45); do
-  sleep 3
-  adb logcat -d -v time > "$LOGFILE"
-  if grep -q 'FlarePort QA: gameplay state constructed' "$LOGFILE" \
-      && grep -q 'FlarePort QA: create character pressed' "$LOGFILE"; then
-    gameplay_constructed=1
-    break
-  fi
-  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
-    echo 'Game crashed during new-character creation.' >&2
-    exit 1
-  fi
-done
-adb exec-out screencap -p > "$DIAGNOSTICS/flare-gameplay.png"
-if [[ "$gameplay_constructed" != 1 ]]; then
-  echo 'Character Create touch did not construct a gameplay state.' >&2
-  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -80 >&2 || true
-  exit 1
-fi
-echo 'Character Create opened the original gameplay state.'
 
 # Android 11 blocks ADB's generic shell UID from reading Android/data.
 # A debug APK permits "run-as": check the game's own files using its app UID.
