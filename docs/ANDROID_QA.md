@@ -21,9 +21,13 @@ Android version and reproducible issues in a GitHub issue.
 - The engine logs an app-owned config path:
   `/storage/emulated/0/Android/data/com.kalandos240.flareempyrean/files/config/flare-game/`
   and separate `userdata/` and game data paths.
-- **Still unverified:** tapping through character creation, movement/combat,
-  device audio, save/reload, ARM device performance, or store installation.
-  A successful launch smoke does not certify these interactions.
+- [ARM APK/AAB build #38159434292](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38159434292) — successful release packaging following touchscreen character-creation changes.
+- [Android emulator character creation #38159434369](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38159434369) — confirmed touchscreen **Play** and **Create** pressed, with original Russian character creation and illustrated Empyrean opening backstory displayed. Its later file-inspection step failed due Android 11 ADB scoped-storage restrictions, not a reported native engine crash.
+- The screenshot originally named `flare-gameplay.png` in this run is an **intro cutscene** (floating Empyrean city), *not* proof that the playable map is ready. The current emulator test now skips the backstory and captures a separate map screenshot.
+- Emulator-only tests use a temporary exported `QaReceiver` to inspect files through the app's own UID. This receiver is **not** included in the RuStore APK or AAB.
+- **Still unverified:** completing the intro into an interactive map, movement/combat,
+  real avatar save/reload, device audio, ARM device performance, or store installation.
+  A successful build or opening UI smoke check does not certify these interactions.
 
 ## First launch and filesystem
 
