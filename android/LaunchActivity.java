@@ -80,6 +80,26 @@ public final class LaunchActivity extends Activity {
         });
     }
 
+    /** Seed only missing preferences; never replace a player's settings. */
+    private void initializeRussianTouchDefaults(File root) throws IOException {
+        File settingsDir = new File(root, "config/flare-game");
+        if (!settingsDir.isDirectory() && !settingsDir.mkdirs()) {
+            throw new IOException("Не удалось создать каталог настроек игры");
+        }
+        File settingsFile = new File(settingsDir, "settings.txt");
+        if (!settingsFile.exists()) {
+            String defaults = "language=ru\n"
+                    + "setup_language=1\n"
+                    + "touch_controls=1\n"
+                    + "mouse_move=0\n"
+                    + "setup_mousemove=1\n"
+                    + "pause_on_focus_loss=1\n";
+            try (FileOutputStream output = new FileOutputStream(settingsFile)) {
+                output.write(defaults.getBytes("UTF-8"));
+            }
+        }
+    }
+
     private void installGameData() throws IOException {
         // The native SDL Android path points to the same app-owned directory.
         File root = getExternalFilesDir(null);
@@ -97,6 +117,7 @@ public final class LaunchActivity extends Activity {
                 && new File(mods, "default").isDirectory()
                 && new File(mods, "fantasycore").isDirectory()
                 && new File(mods, "empyrean_campaign").isDirectory()) {
+            initializeRussianTouchDefaults(root);
             return;
         }
 
@@ -180,6 +201,7 @@ public final class LaunchActivity extends Activity {
         }
 
         reportProgress(totalFiles, totalFiles);
+        initializeRussianTouchDefaults(root);
         // Never write to the saved-game directories.
         File temporaryMarker = new File(root, marker.getName() + ".pending");
         try (FileOutputStream output = new FileOutputStream(temporaryMarker)) {
