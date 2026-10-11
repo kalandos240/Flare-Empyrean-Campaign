@@ -133,10 +133,44 @@ if [[ "$gameplay_open" != 1 ]]; then
   grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -95 >&2 || true
   exit 1
 fi
+# The official campaign starts with a mandatory illustrated backstory after
+# creating the hero. Record it separately: it is not the playable map!
+sleep 10
+adb exec-out screencap -p > "$DIAGNOSTICS/flare-intro.png"
+read -r skip_x skip_y < <(python - "$DIAGNOSTICS/flare-intro.png" <<'PY'
+import struct
+import sys
+with open(sys.argv[1], 'rb') as image:
+    image.seek(16)
+    width, height = struct.unpack('>II', image.read(8))
+print(round(width * .978), round(height * .04))
+PY
+)
+intro_finished=0
+for page in $(seq 1 16); do
+  echo "Advancing backstory page $page via native touchscreen arrow"
+  adb shell input touchscreen tap "$skip_x" "$skip_y"
+  sleep 2
+  adb logcat -d -v time > "$LOGFILE"
+  if grep -q 'FlarePort QA: intro cutscene finished' "$LOGFILE"; then
+    intro_finished=1
+    break
+  fi
+  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+    echo 'The game crashed while playing its opening cutscene.' >&2
+    exit 1
+  fi
+done
+if [[ "$intro_finished" != 1 ]]; then
+  echo 'The original backstory could not be completed using touchscreen arrows.' >&2
+  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -80 >&2 || true
+  exit 1
+fi
+
 sleep 12
 adb exec-out screencap -p > "$DIAGNOSTICS/flare-gameplay.png"
 adb shell pidof "$PACKAGE" >/dev/null
-echo 'Original character created and native gameplay state constructed.'
+echo 'Original hero created, opening cutscene finished and gameplay returned.'
 
 
 # Android 11 blocks both the generic ADB UID and run-as from browsing
