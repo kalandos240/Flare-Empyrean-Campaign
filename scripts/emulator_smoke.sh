@@ -196,11 +196,26 @@ qa_probe() {
 qa_probe inspect
 qa_probe prepare
 
+# Flare's native SDLInputState explicitly saves on SDL_WINDOWEVENT_MINIMIZED
+# for mobile platforms. Home is an actual Android lifecycle transition;
+# the resulting avatar.txt is the engine's real serialized character.
+echo 'Pressing Android Home to trigger Flare native autosave'
+adb shell input keyevent KEYCODE_HOME
+sleep 8
+adb logcat -d -v time > "$LOGFILE"
+if ! grep -q 'InputState: Minimizing app, saving' "$LOGFILE"; then
+  echo 'Expected native mobile save-on-minimize event not observed.' >&2
+  grep -E 'InputState:|SDL/APP|FATAL EXCEPTION|Fatal signal' "$LOGFILE" | tail -100 >&2 || true
+  exit 1
+fi
+qa_probe avatar
+
 adb shell am force-stop "$PACKAGE"
 adb shell am start -W -n "$PACKAGE/$ACTIVITY"
 sleep 25
 adb shell pidof "$PACKAGE" >/dev/null
 qa_probe verify
+qa_probe avatar
 adb exec-out screencap -p > "$DIAGNOSTICS/flare-relaunch.png"
 adb logcat -d -v time > "$LOGFILE"
 if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
@@ -210,4 +225,5 @@ fi
 
 echo 'Flare touchscreen Play opened the original character creator.'
 echo 'Campaign assets, test-only save sentinel and custom settings persisted through relaunch.'
-echo 'Gameplay, combat, real character saves still need further automated/device QA.'
+echo 'The native avatar save was written on Android Home and preserved after relaunch.'
+echo 'Character loading, inventory, combat and physical-device input still need QA.'
