@@ -9,6 +9,7 @@ on:
       - '.github/workflows/android-smoke.yml'
       - 'scripts/prepare_android.py'
       - 'scripts/emulator_smoke.sh'
+      - 'scripts/emulator_load_test.sh'
       - 'scripts/emulator_instrument.py'
       - 'scripts/assert_screen_change.py'
       - 'android/**'
@@ -106,6 +107,9 @@ jobs:
             ${{ runner.temp }}/flare-gameplay.png
             ${{ runner.temp }}/flare-after-play.png
             ${{ runner.temp }}/flare-relaunch.png
+            ${{ runner.temp }}/flare-load-menu.png
+            ${{ runner.temp }}/flare-loaded-gameplay.png
+            ${{ runner.temp }}/flare-load-test.log
             ${{ runner.temp }}/flare-android-smoke.log
           if-no-files-found: warn
           retention-days: 7
