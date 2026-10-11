@@ -192,7 +192,11 @@ def pack_campaign(engine: Path, game: Path, destination: Path) -> None:
 
     (destination.parent / "campaign-info.properties").write_text(manifest, encoding="ascii")
 
-def prepare(engine: Path, game: Path) -> Path:
+def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a") -> Path:
+    supported = {"armeabi-v7a", "arm64-v8a", "x86_64", "x86"}
+    requested = abis.split()
+    if not requested or any(abi not in supported for abi in requested) or len(set(requested)) != len(requested):
+        raise ValueError(f"Unsupported or repeated Android ABI: {abis!r}")
     engine = engine.resolve()
     game = game.resolve()
     project = engine / "flare-android-project"
@@ -228,11 +232,11 @@ def prepare(engine: Path, game: Path) -> Path:
 
     patch_sdl_makefiles(app / "src/main/jni")
 
-    # Store delivery only needs the two ARM ABIs; emulators can be built separately.
+    # Store defaults to ARM ABIs; --abis x86_64 enables separate emulator smoke builds.
     application_mk = app / "src/main/jni/Application.mk"
     application_config = application_mk.read_text(encoding="utf-8")
     application_config, replacements = re.subn(
-        r"(?m)^APP_ABI\s*:=.*$", "APP_ABI := armeabi-v7a arm64-v8a", application_config
+        r"(?m)^APP_ABI\s*:=.*$", "APP_ABI := " + " ".join(requested), application_config
     )
     if replacements != 1:
         raise ValueError("APP_ABI missing from official Android project")
@@ -245,8 +249,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--engine", type=Path, required=True)
     parser.add_argument("--game", type=Path, required=True)
+    parser.add_argument("--abis", default="armeabi-v7a arm64-v8a",
+                        help="Whitespace-separated Android native ABIs. Use x86_64 for emulator tests.")
     args = parser.parse_args()
-    project = prepare(args.engine, args.game)
+    project = prepare(args.engine, args.game, args.abis)
     print(f"Prepared Flare Android project: {project}")
 
 if __name__ == "__main__":
