@@ -56,6 +56,40 @@ if ! adb shell dumpsys activity activities | grep -q 'org.flare.app.FLARE'; then
   exit 1
 fi
 
+# Emulator runner profile pixel_5 is landscape 2340 x 1080.
+# Capture the title first, then send a real Android touch event to "Играть".
+adb exec-out screencap -p > "${RUNNER_TEMP:-/tmp}/flare-native-start.png"
+adb shell input tap 1420 785
+
+character_open=0
+for attempt in $(seq 1 28); do
+  sleep 3
+  adb logcat -d -v time > "$LOGFILE"
+  if grep -q 'FlarePort QA: character creator opened' "$LOGFILE"; then
+    character_open=1
+    break
+  fi
+  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+    echo 'Game crashed while opening the character screen.' >&2
+    exit 1
+  fi
+done
+
+adb exec-out screencap -p > "${RUNNER_TEMP:-/tmp}/flare-character-creation.png"
+if [[ "$character_open" != 1 ]]; then
+  echo 'Touching Играть did not open original character creation.' >&2
+  grep -E 'FlarePort QA|FlarePort|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -100 >&2 || true
+  exit 1
+fi
+
+# Verify first-run app-scoped config contains the intended Russian touch controls.
+APPFILES='/sdcard/Android/data/com.kalandos240.flareempyrean/files'
+adb shell "test -f '$APPFILES/config/flare-game/settings.txt'"
+adb shell "test -d '$APPFILES/userdata/saves'"
+adb shell "cat '$APPFILES/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
+adb shell "cat '$APPFILES/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
+
+echo 'Touch test passed: Play button opened the original character creator.' 
 echo 'Flare: Empyrean Campaign native engine started with the real campaign on Android emulator.'
 # Scale the Play button position in the original main menu to any display size.
 DIAGNOSTICS="${RUNNER_TEMP:-/tmp}"
