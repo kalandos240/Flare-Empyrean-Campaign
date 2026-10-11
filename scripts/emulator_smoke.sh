@@ -108,6 +108,13 @@ adb shell "test -f '$DATA/config/flare-game/settings.txt'"
 adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
 adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
 
+# Verify that application-owned save files and custom settings survive a relaunch.
+# This sentinel is strictly limited to the disposable emulator.
+SAVES_SENTINEL="$DATA/userdata/saves/.flare-ci-persistence-test"
+adb shell "printf 'test-save-2026' > '$SAVES_SENTINEL'"
+adb shell "sed -i '/^pause_on_focus_loss=/d' '$DATA/config/flare-game/settings.txt'"
+adb shell "printf '\\npause_on_focus_loss=0\\n' >> '$DATA/config/flare-game/settings.txt'"
+
 # A second launch must not re-extract the campaign or reset user data.
 MARKER="$DATA/.installed-empyrean-2026-10-11-v2"
 adb shell "test -f '$MARKER'"
@@ -117,6 +124,8 @@ adb shell am start -W -n "$PACKAGE/$ACTIVITY"
 sleep 20
 adb shell pidof "$PACKAGE" >/dev/null
 MARKER_AFTER="$(adb shell stat -c '%Y' "$MARKER" | tr -d '\r')"
+adb shell "cat '$SAVES_SENTINEL'" | tr -d '\r' | grep -qx 'test-save-2026'
+adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -qx 'pause_on_focus_loss=0'
 if [[ "$MARKER_BEFORE" != "$MARKER_AFTER" ]]; then
   echo 'Reopening Flare unexpectedly re-extracted campaign assets.' >&2
   exit 1
@@ -129,5 +138,5 @@ if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
 fi
 
 echo 'Flare touchscreen Play opened the original character creator.'
-echo 'Campaign assets and language/touchscreen config persisted through relaunch.'
+echo 'Campaign assets, custom settings and a simulated save persisted through relaunch.'
 echo 'Gameplay, combat, character saves still need further automated or device QA.'
