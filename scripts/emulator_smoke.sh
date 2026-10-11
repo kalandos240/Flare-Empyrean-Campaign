@@ -131,11 +131,12 @@ echo 'Character Create opened the original gameplay state.'
 DATA="/sdcard/Android/data/$PACKAGE/files"
 echo "Verifying app-owned resources using the debug build's app UID"
 adb shell "run-as $PACKAGE ls -ld '$DATA' '$DATA/config/flare-game' '$DATA/userdata/saves'"
-adb shell "run-as $PACKAGE test -f '$DATA/mods/mods.txt' && test -d '$DATA/mods/empyrean_campaign'"
+adb shell "run-as $PACKAGE test -f '$DATA/mods/mods.txt'"
+adb shell "run-as $PACKAGE test -d '$DATA/mods/empyrean_campaign'"
 adb shell "run-as $PACKAGE test -d '$DATA/userdata/saves'"
-adb shell "test -f '$DATA/config/flare-game/settings.txt'"
+adb shell "run-as $PACKAGE test -f '$DATA/config/flare-game/settings.txt'"
 adb shell "run-as $PACKAGE cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
-adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
+adb shell "run-as $PACKAGE cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
 
 # Verify that application-owned save files and custom settings survive a relaunch.
 # This sentinel is strictly limited to the disposable emulator.
@@ -146,15 +147,15 @@ adb shell "run-as $PACKAGE sh -c 'echo pause_on_focus_loss=0 >> $DATA/config/fla
 
 # A second launch must not re-extract the campaign or reset user data.
 MARKER="$DATA/.installed-empyrean-2026-10-11-v2"
-adb shell "test -f '$MARKER'"
+adb shell "run-as $PACKAGE test -f '$MARKER'"
 MARKER_BEFORE="$(adb shell run-as "$PACKAGE" stat -c '%Y' "$MARKER" | tr -d '\r')"
 adb shell am force-stop "$PACKAGE"
 adb shell am start -W -n "$PACKAGE/$ACTIVITY"
 sleep 20
 adb shell pidof "$PACKAGE" >/dev/null
-MARKER_AFTER="$(adb shell stat -c '%Y' "$MARKER" | tr -d '\r')"
-adb shell "cat '$SAVES_SENTINEL'" | tr -d '\r' | grep -qx 'test-save-2026'
-adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -qx 'pause_on_focus_loss=0'
+MARKER_AFTER="$(adb shell run-as "$PACKAGE" stat -c '%Y' "$MARKER" | tr -d '\r')"
+adb shell "run-as $PACKAGE cat '$SAVES_SENTINEL'" | tr -d '\r' | grep -qx 'test-save-2026'
+adb shell "run-as $PACKAGE cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -qx 'pause_on_focus_loss=0'
 if [[ "$MARKER_BEFORE" != "$MARKER_AFTER" ]]; then
   echo 'Reopening Flare unexpectedly re-extracted campaign assets.' >&2
   exit 1
