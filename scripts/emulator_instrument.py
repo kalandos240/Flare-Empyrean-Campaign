@@ -45,6 +45,43 @@ def instrument(source_dir: Path) -> None:
         '\tsave_load->loadGame();\n\tUtils::logInfo("FlarePort QA: native character save loaded");\n\tloaded = true;',
     )
 
+    # Test-only observability: a directional joystick event must also move
+    # the real hero in the native game world (not just change pixels).
+    inject(
+        src / "MenuTouchControls.cpp",
+        '\t// checking for MAIN1 is redundant, as the touch event itself triggers that\n',
+        '\tstatic bool qa_direction_logged = false;\n'
+        '\tif (!qa_direction_logged && (inpt->pressing[Input::LEFT] || inpt->pressing[Input::RIGHT] || inpt->pressing[Input::UP] || inpt->pressing[Input::DOWN])) {\n'
+        '\t\tqa_direction_logged = true;\n'
+        '\t\tUtils::logInfo("FlarePort QA: virtual joystick directional input received");\n'
+        '\t}\n'
+        '\t// checking for MAIN1 is redundant, as the touch event itself triggers that\n',
+    )
+    inject(
+        src / "GameStatePlay.cpp",
+        '\t\tpc->logic();\n',
+        '\t\tpc->logic();\n'
+        '\t\tstatic int qa_hero_frames = 0;\n'
+        '\t\tstatic bool qa_hero_position_ready = false;\n'
+        '\t\tstatic bool qa_hero_moved = false;\n'
+        '\t\tstatic FPoint qa_hero_start;\n'
+        '\t\tif (!qa_hero_position_ready) {\n'
+        '\t\t\tif (++qa_hero_frames >= 120) {\n'
+        '\t\t\t\tqa_hero_start = pc->stats.pos;\n'
+        '\t\t\t\tqa_hero_position_ready = true;\n'
+        '\t\t\t\tUtils::logInfo("FlarePort QA: hero position baseline %.2f %.2f", qa_hero_start.x, qa_hero_start.y);\n'
+        '\t\t\t}\n'
+        '\t\t}\n'
+        '\t\telse if (!qa_hero_moved) {\n'
+        '\t\t\tconst float qa_dx = pc->stats.pos.x - qa_hero_start.x;\n'
+        '\t\t\tconst float qa_dy = pc->stats.pos.y - qa_hero_start.y;\n'
+        '\t\t\tif (qa_dx * qa_dx + qa_dy * qa_dy > 0.25f) {\n'
+        '\t\t\t\tqa_hero_moved = true;\n'
+        '\t\t\t\tUtils::logInfo("FlarePort QA: hero moved %.2f %.2f", qa_dx, qa_dy);\n'
+        '\t\t\t}\n'
+        '\t\t}\n',
+    )
+
     # Only the emulator test build gets an exported receiver for its own files.
     # Scoped Android/data cannot be inspected by adb shell on Android 11+.
     project = source_dir / "flare-android-project/app/src/main"
