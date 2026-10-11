@@ -139,42 +139,31 @@ adb shell pidof "$PACKAGE" >/dev/null
 echo 'Original character created and native gameplay state constructed.'
 
 
-# Android 11 blocks ADB's generic shell UID from reading Android/data.
-# A debug APK permits "run-as": check the game's own files using its app UID.
-DATA="/sdcard/Android/data/$PACKAGE/files"
-echo 'Checking campaign and save paths using the Android debug app identity'
-adb shell run-as "$PACKAGE" ls "$DATA/mods/mods.txt" >/dev/null
-adb shell run-as "$PACKAGE" ls -d "$DATA/mods/empyrean_campaign" >/dev/null
-adb shell run-as "$PACKAGE" ls -d "$DATA/userdata/saves" >/dev/null
-adb shell run-as "$PACKAGE" ls "$DATA/config/flare-game/settings.txt" >/dev/null
-adb shell run-as "$PACKAGE" cat "$DATA/config/flare-game/settings.txt" | tr -d '\r' | grep -q '^language=ru$'
-adb shell run-as "$PACKAGE" cat "$DATA/config/flare-game/settings.txt" | tr -d '\r' | grep -q '^touch_controls=1$'
-echo 'Russian language and built-in touchscreen controls are configured'
+# Android 11 blocks both the generic ADB UID and run-as from browsing
+# /sdcard/Android/data. Instead use the emulator-only receiver, which executes
+# within the game app and is never included in RuStore builds.
+qa_probe() {
+  local operation="$1"
+  adb logcat -c
+  adb shell am broadcast -n "$PACKAGE/org.flare.app.QaReceiver" \
+    --es operation "$operation"
+  sleep 2
+  adb logcat -d -v time > "$LOGFILE"
+  if ! grep -q "QA $operation PASS" "$LOGFILE"; then
+    echo "App-owned Android storage QA failed: $operation" >&2
+    grep -E 'FlareQA|FATAL EXCEPTION|Fatal signal' "$LOGFILE" | tail -50 >&2 || true
+    exit 1
+  fi
+}
 
-# The sentinel is a test-only file, not a substitute for an actual save game.
-SAVES_SENTINEL="$DATA/userdata/saves/.flare-ci-persistence-test"
-adb shell "run-as $PACKAGE sh -c 'printf test-save-2026 > \"$SAVES_SENTINEL\"'"
-adb shell "run-as $PACKAGE sh -c 'printf \"\n# ci-preference-preservation-check\n\" >> \"$DATA/config/flare-game/settings.txt\"'"
-adb shell run-as "$PACKAGE" cat "$SAVES_SENTINEL" | tr -d '\r' | grep -qx 'test-save-2026'
-echo 'Test save sentinel and preference marker written'
+qa_probe inspect
+qa_probe prepare
 
-# A second launch must not re-extract the campaign or reset user data.
-MARKER="$DATA/.installed-empyrean-2026-10-11-v2"
-adb shell run-as "$PACKAGE" ls "$MARKER" >/dev/null
-MARKER_BEFORE="$(adb shell run-as "$PACKAGE" stat -c '%Y' "$MARKER" | tr -d '\r')"
 adb shell am force-stop "$PACKAGE"
 adb shell am start -W -n "$PACKAGE/$ACTIVITY"
-sleep 20
+sleep 25
 adb shell pidof "$PACKAGE" >/dev/null
-
-echo 'Checking unchanged campaign marker and user files after restart'
-MARKER_AFTER="$(adb shell run-as "$PACKAGE" stat -c '%Y' "$MARKER" | tr -d '\r')"
-adb shell run-as "$PACKAGE" cat "$SAVES_SENTINEL" | tr -d '\r' | grep -qx 'test-save-2026'
-adb shell run-as "$PACKAGE" cat "$DATA/config/flare-game/settings.txt" | tr -d '\r' | grep -q 'ci-preference-preservation-check'
-if [[ "$MARKER_BEFORE" != "$MARKER_AFTER" ]]; then
-  echo 'Reopening Flare unexpectedly re-extracted campaign assets.' >&2
-  exit 1
-fi
+qa_probe verify
 adb exec-out screencap -p > "$DIAGNOSTICS/flare-relaunch.png"
 adb logcat -d -v time > "$LOGFILE"
 if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
@@ -183,5 +172,5 @@ if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
 fi
 
 echo 'Flare touchscreen Play opened the original character creator.'
-echo 'Campaign assets, custom settings and a simulated save persisted through relaunch.'
+echo 'Campaign assets, test-only save sentinel and custom settings persisted through relaunch.'
 echo 'Gameplay, combat, real character saves still need further automated/device QA.'
