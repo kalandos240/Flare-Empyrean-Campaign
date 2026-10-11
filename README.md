@@ -15,10 +15,12 @@ two pinned upstream revisions and creates an Android app from them:
 
 - Uses the official Flare Android/SDL2 native code rather than replacing the gameplay.
 - Packages the `default`, `fantasycore` and `empyrean_campaign` mods into the app.
-- Provides a first-launch installer that unpacks original game files off the UI thread.
-- Redirects the engine's config and saves to **app-specific Android storage**.
+- Provides a first-launch installer that unpacks original game files off the UI thread, reports progress and checks available disk space.
+- Redirects the engine's config and saves to **app-specific Android storage**, separate from campaign assets; updates do not overwrite player saves.
 - Removes broad `WRITE_EXTERNAL_STORAGE` and `MANAGE_EXTERNAL_STORAGE` permissions.
 - Adds a separate Android launcher and explicit Android 12+ activity visibility settings.
+- Targets ARMv7 and ARM64 to avoid large unused x86 shared libraries in RuStore builds.
+- Includes a machine-readable campaign file count/uncompressed-size manifest and APK permission/ABI audits in CI.
 - Configures app identifier `com.kalandos240.flareempyrean`, API 24+ and target API 35.
 - Reuses the original game's in-engine mobile/touch control UI and Russian localization.
 - Includes automated Python packaging tests and an Android GitHub Actions build.
@@ -30,8 +32,9 @@ must pass testing before any submission to RuStore; a CI artifact is *not* a sig
 
 On each push to the port branch, [GitHub Actions](../../actions/workflows/android.yml)
 runs packaging tests, downloads the pinned source revisions (including SDL git
-submodules), generates `campaign.zip`, builds a debug APK and attempts an unsigned
-release AAB. When successful, get the binaries from the workflow **Artifacts**.
+submodules), generates `campaign.zip` and its size manifest, builds a debug APK
+and an unsigned release AAB. It checks APK permissions, package identifier,
+architecture support, and bundled game data. When successful, get the binaries from the workflow **Artifacts**.
 
 For local builds:
 
@@ -71,7 +74,7 @@ store screenshots, privacy documentation and a complete license audit remain to 
 
 ## Limitations / next steps
 
-- Confirm and fix any Gradle/NDK/SDL build errors in CI.
+- Complete CI validation for the updated Android assets installer, and inspect APK/AAB sizes.
 - Validate installation times and APK size on physical devices.
 - Check Android 15 edge-to-edge layout, display cutouts, touch target sizes and input.
 - Test save persistence, lifecycle pause/resume and crash recovery.
