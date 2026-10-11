@@ -56,10 +56,12 @@ if (( opened == 0 )); then
   exit 1
 fi
 
-# Upstream fantasycore/menus/gameload.txt: Load Game button (1050,480)
-# relative to the top-left of the centered 1632px UI frame.
-button_x=$(((width - 1632) / 2 + 1050 + 96))
-button_y=504
+# Original fantasycore/menus/gameload.txt positions the button at
+# (1050,480) relative to a centered 1632px frame; its sprite is offset
+# from this anchor. The Android emulator screenshot confirms the actual
+# interactive button center at ~1580x564 on a 2340x1080 screen.
+button_x=$(((width - 1632) / 2 + 1226))
+button_y=$((height * 522 / 1000))
 echo "Pressing original Load Game button: $button_x $button_y"
 adb logcat -c
 adb shell input touchscreen tap "$button_x" "$button_y"
