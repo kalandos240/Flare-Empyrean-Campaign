@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# An updated port supersedes older runs on the same branch.
+concurrency:
+  group: flare-rustore-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -94,13 +99,51 @@ jobs:
             echo 'Broad filesystem permissions found in APK' >&2
             exit 1
           fi
-          if unzip -Z1 "$APK" | grep -Eq '^lib/(x86|x86_64)/'; then
+          unzip -Z1 "$APK" > "$RUNNER_TEMP/flare-apk-entries.txt"
+          unzip -Z1 "$AAB" > "$RUNNER_TEMP/flare-aab-entries.txt"
+          if grep -Eq '^lib/(x86|x86_64)/' "$RUNNER_TEMP/flare-apk-entries.txt"; then
             echo 'Unexpected x86 native libraries in store APK' >&2
             exit 1
           fi
-          unzip -Z1 "$APK" | grep -q 'assets/campaign.zip'
-          unzip -Z1 "$APK" | grep -q 'assets/campaign-info.properties'
-          unzip -Z1 "$AAB" | grep -q 'base/assets/campaign.zip'
+          grep -q '^assets/campaign.zip
+
+      - name: Upload debug install and unsigned AAB
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flare-empyrean-android-unsigned
+          path: |
+            upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/*.apk
+            upstream/flare-engine/flare-android-project/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+ "$RUNNER_TEMP/flare-apk-entries.txt"
+          grep -q '^assets/campaign-info.properties
+
+      - name: Upload debug install and unsigned AAB
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flare-empyrean-android-unsigned
+          path: |
+            upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/*.apk
+            upstream/flare-engine/flare-android-project/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+ "$RUNNER_TEMP/flare-apk-entries.txt"
+          grep -q '^base/assets/campaign.zip
+
+      - name: Upload debug install and unsigned AAB
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flare-empyrean-android-unsigned
+          path: |
+            upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/*.apk
+            upstream/flare-engine/flare-android-project/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+ "$RUNNER_TEMP/flare-aab-entries.txt"
 
       - name: Upload debug install and unsigned AAB
         uses: actions/upload-artifact@v4
