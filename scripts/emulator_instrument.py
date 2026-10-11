@@ -33,6 +33,14 @@ def instrument(source_dir: Path) -> None:
         '{\n\tUtils::logInfo("FlarePort QA: gameplay state constructed");\n\tsecond_timer.setDuration(settings->max_frames_per_sec);',
     )
 
+    # The intro cutscene must *finish* before we claim playable gameplay.
+    # This diagnostic marker is never injected into production APK/AAB builds.
+    inject(
+        src / "GameStateCutscene.cpp",
+        'if (scenes.empty() || scene_index >= scenes.size()) {',
+        'if (scenes.empty() || scene_index >= scenes.size()) {\n\t\tUtils::logInfo("FlarePort QA: intro cutscene finished");',
+    )
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
