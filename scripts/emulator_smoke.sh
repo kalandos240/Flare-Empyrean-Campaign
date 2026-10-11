@@ -226,4 +226,7 @@ fi
 echo 'Flare touchscreen Play opened the original character creator.'
 echo 'Campaign assets, test-only save sentinel and custom settings persisted through relaunch.'
 echo 'The native avatar save was written on Android Home and preserved after relaunch.'
-echo 'Character loading, inventory, combat and physical-device input still need QA.'
+echo 'Next: load this saved character through Flare original menu.'
+bash scripts/emulator_load_test.sh
+
+echo 'Inventory, combat and physical-device input still need QA.'
