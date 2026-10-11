@@ -12,7 +12,7 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
 PACKAGE_ID = "com.kalandos240.flareempyrean"
-CONTENT_VERSION = "empyrean-2026-10-11-v1"
+CONTENT_VERSION = "empyrean-2026-10-11-v2"
 
 APP_GRADLE = """plugins {
     id 'com.android.application'
@@ -96,117 +96,6 @@ public class FLARE extends SDLActivity {
     @Override
     protected String[] getLibraries() {
         return new String[] { "SDL2", "SDL2_image", "SDL2_mixer", "SDL2_ttf", "main" };
-    }
-}
-"""
-
-LAUNCH_ACTIVITY = """package org.flare.app;
-
-import android.app.Activity;
-import android.content.Intent;
-import android.os.Bundle;
-import android.util.Log;
-import android.view.Gravity;
-import android.widget.TextView;
-
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-
-/** First-launch installer: extracts original open-source game data into app storage. */
-public class LaunchActivity extends Activity {
-    private static final String TAG = "FlarePort";
-    private static final String DATA_VERSION = "empyrean-2026-10-11-v1";
-    private TextView message;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        message = new TextView(this);
-        message.setGravity(Gravity.CENTER);
-        message.setTextSize(19f);
-        message.setText("Подготовка Flare: Empyrean Campaign…");
-        setContentView(message);
-
-        // Do not unzip a large campaign archive on Android's main thread.
-        Thread worker = new Thread(() -> {
-            try {
-                installGameData();
-                runOnUiThread(() -> {
-                    if (!isFinishing() && !isDestroyed()) {
-                        startActivity(new Intent(this, FLARE.class));
-                        finish();
-                    }
-                });
-            } catch (Exception error) {
-                Log.e(TAG, "Cannot install game content", error);
-                runOnUiThread(() ->
-                    message.setText("Ошибка подготовки игровых файлов:\\n" + error.getMessage()));
-            }
-        }, "flare-assets-installer");
-        worker.start();
-    }
-
-    private void installGameData() throws IOException {
-        File root = getExternalFilesDir(null);
-        if (root == null) {
-            throw new IOException("Недоступно хранилище приложения");
-        }
-        File marker = new File(root, ".installed-" + DATA_VERSION);
-        if (marker.isFile()
-                && new File(root, "mods/default").isDirectory()
-                && new File(root, "mods/fantasycore").isDirectory()
-                && new File(root, "mods/empyrean_campaign").isDirectory()) {
-            return;
-        }
-
-        final String rootPrefix = root.getCanonicalPath() + File.separator;
-        byte[] buffer = new byte[64 * 1024];
-
-        try (InputStream input = getAssets().open("campaign.zip");
-             ZipInputStream zip = new ZipInputStream(input)) {
-            ZipEntry entry;
-            while ((entry = zip.getNextEntry()) != null) {
-                File destination = new File(root, entry.getName());
-                // Never allow a malformed archive to write outside app storage.
-                if (!destination.getCanonicalPath().startsWith(rootPrefix)) {
-                    throw new IOException("Недопустимый путь в архиве: " + entry.getName());
-                }
-                if (entry.isDirectory()) {
-                    if (!destination.isDirectory() && !destination.mkdirs()) {
-                        throw new IOException("Не удалось создать каталог: " + destination);
-                    }
-                } else {
-                    File parent = destination.getParentFile();
-                    if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                        throw new IOException("Не удалось создать каталог: " + parent);
-                    }
-                    try (BufferedOutputStream output =
-                             new BufferedOutputStream(new FileOutputStream(destination))) {
-                        int count;
-                        while ((count = zip.read(buffer)) != -1) {
-                            output.write(buffer, 0, count);
-                        }
-                    }
-                }
-                zip.closeEntry();
-            }
-        }
-
-        if (!new File(root, "mods/mods.txt").isFile()
-                || !new File(root, "mods/default").isDirectory()
-                || !new File(root, "mods/empyrean_campaign").isDirectory()) {
-            throw new IOException("В игровом архиве отсутствуют обязательные моды");
-        }
-
-        // The marker is only written after all required files have been extracted.
-        try (FileOutputStream out = new FileOutputStream(marker)) {
-            out.write(DATA_VERSION.getBytes("UTF-8"));
-        }
     }
 }
 """
@@ -298,6 +187,11 @@ def pack_campaign(engine: Path, game: Path, destination: Path) -> None:
             if source.is_file():
                 output.write(source, target)
 
+        file_list = output.infolist()
+        manifest = f"files={len(file_list)}\nbytes={sum(item.file_size for item in file_list)}\n"
+
+    (destination.parent / "campaign-info.properties").write_text(manifest, encoding="ascii")
+
 def prepare(engine: Path, game: Path) -> Path:
     engine = engine.resolve()
     game = game.resolve()
@@ -312,7 +206,10 @@ def prepare(engine: Path, game: Path) -> Path:
     (app / "build.gradle").write_text(APP_GRADLE, encoding="utf-8")
     (app / "src/main/AndroidManifest.xml").write_text(MANIFEST, encoding="utf-8")
     (java / "FLARE.java").write_text(FLARE_ACTIVITY, encoding="utf-8")
-    (java / "LaunchActivity.java").write_text(LAUNCH_ACTIVITY, encoding="utf-8")
+    (java / "LaunchActivity.java").write_text(
+        (Path(__file__).resolve().parents[1] / "android/LaunchActivity.java").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     strings = app / "src/main/res/values/strings.xml"
     strings.write_text(
         '<resources><string name="app_name">Flare: Empyrean Campaign</string></resources>\n',
@@ -330,6 +227,17 @@ def prepare(engine: Path, game: Path) -> Path:
     )
 
     patch_sdl_makefiles(app / "src/main/jni")
+
+    # Store delivery only needs the two ARM ABIs; emulators can be built separately.
+    application_mk = app / "src/main/jni/Application.mk"
+    application_config = application_mk.read_text(encoding="utf-8")
+    application_config, replacements = re.subn(
+        r"(?m)^APP_ABI\\s*:=.*$", "APP_ABI := armeabi-v7a arm64-v8a", application_config
+    )
+    if replacements != 1:
+        raise ValueError("APP_ABI missing from official Android project")
+    application_mk.write_text(application_config, encoding="utf-8")
+
     pack_campaign(engine, game, app / "src/main/assets/campaign.zip")
     return project
 
