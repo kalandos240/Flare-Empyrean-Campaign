@@ -9,6 +9,7 @@ on:
       - '.github/workflows/android-smoke.yml'
       - 'scripts/prepare_android.py'
       - 'scripts/emulator_smoke.sh'
+      - 'scripts/assert_screen_change.py'
       - 'android/**'
 
 permissions:
@@ -29,8 +30,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run packaging tests
-        run: python -m unittest discover -s tests -v
+      - name: Run packaging tests and install screenshot tools
+        run: |
+          python -m unittest discover -s tests -v
+          python -m pip install 'Pillow>=10,<13'
 
       - uses: actions/setup-java@v4
         with:
@@ -85,7 +88,7 @@ jobs:
           disable-animations: true
           script: |
             bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
-            adb exec-out screencap -p > "$RUNNER_TEMP/flare-native-start.png"
+            echo "Emulator interaction and screenshots completed."
 
       - name: Upload emulator screenshot and logs
         if: always()
@@ -94,6 +97,8 @@ jobs:
           name: flare-emulator-diagnostics
           path: |
             ${{ runner.temp }}/flare-native-start.png
+            ${{ runner.temp }}/flare-after-play.png
+            ${{ runner.temp }}/flare-relaunch.png
             ${{ runner.temp }}/flare-android-smoke.log
           if-no-files-found: warn
           retention-days: 7
