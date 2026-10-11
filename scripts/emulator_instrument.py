@@ -32,6 +32,19 @@ def instrument(source_dir: Path) -> None:
         '{\n\tsecond_timer.setDuration(settings->max_frames_per_sec);',
         '{\n\tUtils::logInfo("FlarePort QA: gameplay state constructed");\n\tsecond_timer.setDuration(settings->max_frames_per_sec);',
     )
+    # Mark actual save-slot UI entry and the engine's own SaveLoad::loadGame()
+    # call. These are not included in release APKs.
+    inject(
+        src / "GameStateLoad.cpp",
+        '\tif (items == NULL)\n',
+        '\tUtils::logInfo("FlarePort QA: load-game menu opened");\n\tif (items == NULL)\n',
+    )
+    inject(
+        src / "GameStateLoad.cpp",
+        '\tsave_load->loadGame();\n\tloaded = true;',
+        '\tsave_load->loadGame();\n\tUtils::logInfo("FlarePort QA: native character save loaded");\n\tloaded = true;',
+    )
+
     # Only the emulator test build gets an exported receiver for its own files.
     # Scoped Android/data cannot be inspected by adb shell on Android 11+.
     project = source_dir / "flare-android-project/app/src/main"
