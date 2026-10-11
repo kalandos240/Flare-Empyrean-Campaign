@@ -70,7 +70,7 @@ with open(sys.argv[1], "rb") as png:
 if header[:8] != b"\x89PNG\r\n\x1a\n":
     raise SystemExit("Android screenshot is not PNG")
 width, height = struct.unpack(">II", header[16:24])
-print(round(width * 0.47), round(height * 0.56))
+print(round(width * 0.607), round(height * 0.725))
 PY
 )
 echo "Tapping original Play button at $tap_x,$tap_y"
