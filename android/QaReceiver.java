@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 /**
  * Emulator-only QA bridge. NEVER included in a release APK.
@@ -62,6 +63,26 @@ public final class QaReceiver extends BroadcastReceiver {
                     write(settings, "\n" + PREF_MARK + "\n", true);
                 }
                 Log.i(TAG, "QA prepare PASS; app-owned save sentinel and settings marker written");
+            } else if ("avatar".equals(op)) {
+                // Only a genuine engine save creates avatar.txt in the campaign
+                // save slot. This is not the simulated sentinel used above.
+                File avatar = new File(saves, "empyrean/1/avatar.txt");
+                if (!avatar.isFile() || avatar.length() < 32) {
+                    throw new IllegalStateException("The native Empyrean character save is missing");
+                }
+                File baseline = new File(saves, ".flare-ci-avatar-baseline");
+                byte[] savedAvatar = Files.readAllBytes(avatar.toPath());
+                if (baseline.isFile()) {
+                    if (!Arrays.equals(savedAvatar, Files.readAllBytes(baseline.toPath()))) {
+                        throw new IllegalStateException("The real avatar save changed on relaunch");
+                    }
+                } else {
+                    try (FileOutputStream output = new FileOutputStream(baseline)) {
+                        output.write(savedAvatar);
+                        output.getFD().sync();
+                    }
+                }
+                Log.i(TAG, "QA avatar PASS; real engine character saved and persisted");
             } else if ("verify".equals(op)) {
                 File testFile = new File(saves, ".flare-ci-persistence-test");
                 if (!testFile.isFile()
