@@ -9,6 +9,7 @@ on:
       - '.github/workflows/android-smoke.yml'
       - 'scripts/prepare_android.py'
       - 'scripts/emulator_smoke.sh'
+      - 'scripts/emulator_instrument.py'
       - 'scripts/assert_screen_change.py'
       - 'android/**'
 
@@ -65,6 +66,9 @@ jobs:
         run: |
           python scripts/prepare_android.py --engine upstream/flare-engine --game upstream/flare-game --abis x86_64
 
+      - name: Enable emulator-only stage markers
+        run: python scripts/emulator_instrument.py --engine upstream/flare-engine
+
       - name: Build debug emulator APK
         working-directory: upstream/flare-engine/flare-android-project
         run: |
@@ -97,6 +101,7 @@ jobs:
           name: flare-emulator-diagnostics
           path: |
             ${{ runner.temp }}/flare-native-start.png
+            ${{ runner.temp }}/flare-character-creation.png
             ${{ runner.temp }}/flare-after-play.png
             ${{ runner.temp }}/flare-relaunch.png
             ${{ runner.temp }}/flare-android-smoke.log
