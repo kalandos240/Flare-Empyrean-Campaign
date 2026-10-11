@@ -42,7 +42,7 @@ public final class QaProbe {
             throw new IOException("FlarePort QA: Russian touch control defaults absent");
         }
 
-        File sentinel = new File(saves, ".flare-ci-persistence-test");
+        File sentinel = new File(saves, ".flare-ci-launcher-check");
         String expected = "test-save|" + installMarker.lastModified();
         if (sentinel.isFile()) {
             String actual = new String(Files.readAllBytes(sentinel.toPath()), StandardCharsets.UTF_8);
