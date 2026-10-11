@@ -263,8 +263,8 @@ def patch_sdl_makefiles(jni: Path) -> None:
         content = makefile.read_text(encoding="utf-8")
         for variable in toggles:
             content = re.sub(
-                rf"(?m)^({variable}\\s*[:?+]?=\\s*)(?:true|1)\\b",
-                r"\\g<1>false",
+                rf"(?m)^({variable}\s*[:?+]?=\s*)(?:true|1)\b",
+                r"\g<1>false",
                 content,
             )
         makefile.write_text(content, encoding="utf-8")
@@ -287,8 +287,8 @@ def pack_campaign(engine: Path, game: Path, destination: Path) -> None:
                     relative = path.relative_to(source_directory).as_posix()
                     output.write(path, f"{target_directory}/{relative}")
 
-        output.writestr("mods/mods.txt", "fantasycore\\nempyrean_campaign\\n")
-        output.writestr("mods/game.txt", "flare-game\\n")
+        output.writestr("mods/mods.txt", "fantasycore\nempyrean_campaign\n")
+        output.writestr("mods/game.txt", "flare-game\n")
         output.write(engine / "COPYING", "licenses/flare-engine-GPL-3.0.txt")
         output.write(game / "LICENSE.txt", "licenses/flare-game-CC-BY-SA-3.0.txt")
         for source, target in [
@@ -315,7 +315,7 @@ def prepare(engine: Path, game: Path) -> Path:
     (java / "LaunchActivity.java").write_text(LAUNCH_ACTIVITY, encoding="utf-8")
     strings = app / "src/main/res/values/strings.xml"
     strings.write_text(
-        '<resources><string name="app_name">Flare: Empyrean Campaign</string></resources>\\n',
+        '<resources><string name="app_name">Flare: Empyrean Campaign</string></resources>\n',
         encoding="utf-8",
     )
 
