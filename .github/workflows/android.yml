@@ -9,6 +9,7 @@ on:
     paths:
       - '.github/workflows/android.yml'
       - 'scripts/**'
+      - 'tests/**'
       - 'README.md'
 
 permissions:
@@ -35,8 +36,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
-          cache-dependency-path: '**/gradle/wrapper/gradle-wrapper.properties'
 
       - name: Android SDK
         uses: android-actions/setup-android@v3
