@@ -65,6 +65,10 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn(PACKAGE_ID, (app / "build.gradle").read_text())
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
             self.assertEqual((jni / "Application.mk").read_text(), "APP_ABI := armeabi-v7a arm64-v8a\n")
+            prepare(engine, game, abis="x86_64")
+            self.assertEqual((jni / "Application.mk").read_text(), "APP_ABI := x86_64\n")
+            with self.assertRaises(ValueError):
+                prepare(engine, game, abis="INVALID_ABI")
             self.assertIn("getExternalFilesDir", (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text())
             launcher = (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text()
             self.assertIn(CONTENT_VERSION, launcher)
