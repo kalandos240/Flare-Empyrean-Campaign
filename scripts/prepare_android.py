@@ -232,7 +232,7 @@ def prepare(engine: Path, game: Path) -> Path:
     application_mk = app / "src/main/jni/Application.mk"
     application_config = application_mk.read_text(encoding="utf-8")
     application_config, replacements = re.subn(
-        r"(?m)^APP_ABI\\s*:=.*$", "APP_ABI := armeabi-v7a arm64-v8a", application_config
+        r"(?m)^APP_ABI\s*:=.*$", "APP_ABI := armeabi-v7a arm64-v8a", application_config
     )
     if replacements != 1:
         raise ValueError("APP_ABI missing from official Android project")
