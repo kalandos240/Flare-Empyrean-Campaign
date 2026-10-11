@@ -74,6 +74,34 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon :app:assembleDebug :app:bundleRelease --stacktrace
 
+      - name: Inspect APK, AAB and packaged campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP='upstream/flare-engine/flare-android-project/app'
+          APK="$APP/build/outputs/apk/debug/app-debug.apk"
+          AAB="$APP/build/outputs/bundle/release/app-release.aab"
+          META="$APP/src/main/assets/campaign-info.properties"
+          echo 'APK/AAB sizes (bytes):'
+          stat -c '%n %s' "$APK" "$AAB"
+          echo 'Campaign manifest:'
+          cat "$META"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$AAPT" dump badging "$APK" | grep -E '^(package:|sdkVersion:|targetSdkVersion:|native-code:|application-label:)'
+          "$AAPT" dump badging "$APK" | grep -q "name='com.kalandos240.flareempyrean'"
+          "$AAPT" dump badging "$APK" | grep -q 'arm64-v8a'
+          if "$AAPT" dump permissions "$APK" | grep -Eq 'MANAGE_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE'; then
+            echo 'Broad filesystem permissions found in APK' >&2
+            exit 1
+          fi
+          if unzip -Z1 "$APK" | grep -Eq '^lib/(x86|x86_64)/'; then
+            echo 'Unexpected x86 native libraries in store APK' >&2
+            exit 1
+          fi
+          unzip -Z1 "$APK" | grep -q 'assets/campaign.zip'
+          unzip -Z1 "$APK" | grep -q 'assets/campaign-info.properties'
+          unzip -Z1 "$AAB" | grep -q 'base/assets/campaign.zip'
+
       - name: Upload debug install and unsigned AAB
         uses: actions/upload-artifact@v4
         if: success()
