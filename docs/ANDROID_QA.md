@@ -1,6 +1,12 @@
 # Flare: Empyrean Campaign — Android / RuStore device acceptance checklist
 
 **Status:** The Gradle/NDK CI build is a build verification, not gameplay certification.
+The separate [Android emulator smoke workflow](../.github/workflows/android-smoke.yml)
+builds an x86_64 testing APK, installs the campaign in an emulator, and checks
+for the native engine's active-mods log entry and process survival. It uploads
+a startup screenshot and log for review. Passing this check **does not** prove
+that touch gameplay, all assets, and saving work on ARM devices.
+
 Please test the debug APK on a physical Android phone and record its model,
 Android version and reproducible issues in a GitHub issue.
 
