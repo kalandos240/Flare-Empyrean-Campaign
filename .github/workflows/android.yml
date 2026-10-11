@@ -8,9 +8,9 @@ on:
       - port/rustore-android-foundation
     paths:
       - '.github/workflows/android.yml'
-      - 'scripts/**'
-      - 'tests/**'
-      - 'android/**'
+      - 'scripts/prepare_android.py'
+      - 'tests/test_prepare_android.py'
+      - 'android/LaunchActivity.java'
       - 'README.md'
 
 permissions:
