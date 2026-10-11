@@ -1,0 +1,99 @@
+name: Android emulator launch smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - port/rustore-android-foundation
+    paths:
+      - '.github/workflows/android-smoke.yml'
+      - 'scripts/prepare_android.py'
+      - 'scripts/emulator_smoke.sh'
+      - 'android/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flare-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run packaging tests
+        run: python -m unittest discover -s tests -v
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install NDK
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$PATH"
+          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned upstream engine and game
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          git init upstream/flare-engine
+          git -C upstream/flare-engine remote add origin https://github.com/flareteam/flare-engine.git
+          git -C upstream/flare-engine fetch --depth 1 origin 1969baeb89ebf94cf22e2bc2ed4e3d8413714d4f
+          git -C upstream/flare-engine checkout --detach FETCH_HEAD
+          git -C upstream/flare-engine submodule update --init --recursive
+
+          git init upstream/flare-game
+          git -C upstream/flare-game remote add origin https://github.com/flareteam/flare-game.git
+          git -C upstream/flare-game fetch --depth 1 origin af6eee6d339ac98011864bfe89da837fe7769c28
+          git -C upstream/flare-game checkout --detach FETCH_HEAD
+
+      - name: Prepare x86_64 smoke-only APK
+        run: |
+          python scripts/prepare_android.py --engine upstream/flare-engine --game upstream/flare-game --abis x86_64
+
+      - name: Build debug emulator APK
+        working-directory: upstream/flare-engine/flare-android-project
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Boot emulator and confirm native campaign loads
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -partition-size 8192
+          disable-animations: true
+          script: |
+            bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
+            adb exec-out screencap -p > "$RUNNER_TEMP/flare-native-start.png"
+
+      - name: Upload emulator screenshot and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flare-emulator-diagnostics
+          path: |
+            ${{ runner.temp }}/flare-native-start.png
+            ${{ runner.temp }}/flare-android-smoke.log
+          if-no-files-found: warn
+          retention-days: 7
