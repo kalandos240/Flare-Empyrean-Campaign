@@ -17,14 +17,6 @@ def inject(path: Path, anchor: str, replacement: str) -> None:
 
 def instrument(source_dir: Path) -> None:
     src = source_dir / "src"
-    java = source_dir / "flare-android-project/app/src/main/java/org/flare/app"
-    probe = Path(__file__).resolve().parents[1] / "android/QaProbe.java"
-    (java / "QaProbe.java").write_text(probe.read_text(encoding="utf-8"), encoding="utf-8")
-    inject(
-        java / "LaunchActivity.java",
-        "                installGameData();\n",
-        "                installGameData();\n                QaProbe.verifyOrSeed(this);\n",
-    )
     inject(
         src / "GameStateNew.cpp",
         '{\n\t// set up buttons\n',
