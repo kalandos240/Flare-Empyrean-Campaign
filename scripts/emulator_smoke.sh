@@ -127,35 +127,38 @@ if [[ "$gameplay_constructed" != 1 ]]; then
 fi
 echo 'Character Create opened the original gameplay state.'
 
-# Confirm the installed campaign and Russian touchscreen settings.
+# Android 11 blocks ADB's generic shell UID from reading Android/data.
+# A debug APK permits "run-as": check the game's own files using its app UID.
 DATA="/sdcard/Android/data/$PACKAGE/files"
-echo "Verifying app-owned resources using the debug build's app UID"
-adb shell "run-as $PACKAGE ls -ld '$DATA' '$DATA/config/flare-game' '$DATA/userdata/saves'"
-adb shell "run-as $PACKAGE test -f '$DATA/mods/mods.txt'"
-adb shell "run-as $PACKAGE test -d '$DATA/mods/empyrean_campaign'"
-adb shell "run-as $PACKAGE test -d '$DATA/userdata/saves'"
-adb shell "run-as $PACKAGE test -f '$DATA/config/flare-game/settings.txt'"
-adb shell "run-as $PACKAGE cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
-adb shell "run-as $PACKAGE cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
+echo 'Checking campaign and save paths using the Android debug app identity'
+adb shell run-as "$PACKAGE" ls "$DATA/mods/mods.txt" >/dev/null
+adb shell run-as "$PACKAGE" ls -d "$DATA/mods/empyrean_campaign" >/dev/null
+adb shell run-as "$PACKAGE" ls -d "$DATA/userdata/saves" >/dev/null
+adb shell run-as "$PACKAGE" ls "$DATA/config/flare-game/settings.txt" >/dev/null
+adb shell run-as "$PACKAGE" cat "$DATA/config/flare-game/settings.txt" | tr -d '\r' | grep -q '^language=ru$'
+adb shell run-as "$PACKAGE" cat "$DATA/config/flare-game/settings.txt" | tr -d '\r' | grep -q '^touch_controls=1$'
+echo 'Russian language and built-in touchscreen controls are configured'
 
-# Verify that application-owned save files and custom settings survive a relaunch.
-# This sentinel is strictly limited to the disposable emulator.
+# The sentinel is a test-only file, not a substitute for an actual save game.
 SAVES_SENTINEL="$DATA/userdata/saves/.flare-ci-persistence-test"
-adb shell "run-as $PACKAGE sh -c 'echo test-save-2026 > $SAVES_SENTINEL'"
-adb shell "run-as $PACKAGE sed -i '/^pause_on_focus_loss=/d' '$DATA/config/flare-game/settings.txt'"
-adb shell "run-as $PACKAGE sh -c 'echo pause_on_focus_loss=0 >> $DATA/config/flare-game/settings.txt'"
+adb shell "run-as $PACKAGE sh -c 'printf test-save-2026 > \"$SAVES_SENTINEL\"'"
+adb shell "run-as $PACKAGE sh -c 'printf \"\n# ci-preference-preservation-check\n\" >> \"$DATA/config/flare-game/settings.txt\"'"
+adb shell run-as "$PACKAGE" cat "$SAVES_SENTINEL" | tr -d '\r' | grep -qx 'test-save-2026'
+echo 'Test save sentinel and preference marker written'
 
 # A second launch must not re-extract the campaign or reset user data.
 MARKER="$DATA/.installed-empyrean-2026-10-11-v2"
-adb shell "run-as $PACKAGE test -f '$MARKER'"
+adb shell run-as "$PACKAGE" ls "$MARKER" >/dev/null
 MARKER_BEFORE="$(adb shell run-as "$PACKAGE" stat -c '%Y' "$MARKER" | tr -d '\r')"
 adb shell am force-stop "$PACKAGE"
 adb shell am start -W -n "$PACKAGE/$ACTIVITY"
 sleep 20
 adb shell pidof "$PACKAGE" >/dev/null
+
+echo 'Checking unchanged campaign marker and user files after restart'
 MARKER_AFTER="$(adb shell run-as "$PACKAGE" stat -c '%Y' "$MARKER" | tr -d '\r')"
-adb shell "run-as $PACKAGE cat '$SAVES_SENTINEL'" | tr -d '\r' | grep -qx 'test-save-2026'
-adb shell "run-as $PACKAGE cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -qx 'pause_on_focus_loss=0'
+adb shell run-as "$PACKAGE" cat "$SAVES_SENTINEL" | tr -d '\r' | grep -qx 'test-save-2026'
+adb shell run-as "$PACKAGE" cat "$DATA/config/flare-game/settings.txt" | tr -d '\r' | grep -q 'ci-preference-preservation-check'
 if [[ "$MARKER_BEFORE" != "$MARKER_AFTER" ]]; then
   echo 'Reopening Flare unexpectedly re-extracted campaign assets.' >&2
   exit 1
@@ -169,4 +172,4 @@ fi
 
 echo 'Flare touchscreen Play opened the original character creator.'
 echo 'Campaign assets, custom settings and a simulated save persisted through relaunch.'
-echo 'Gameplay, combat, character saves still need further automated or device QA.'
+echo 'Gameplay, combat, real character saves still need further automated/device QA.'
