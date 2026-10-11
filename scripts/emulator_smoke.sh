@@ -56,46 +56,13 @@ if ! adb shell dumpsys activity activities | grep -q 'org.flare.app.FLARE'; then
   exit 1
 fi
 
-# Emulator runner profile pixel_5 is landscape 2340 x 1080.
-# Capture the title first, then send a real Android touch event to "Играть".
-adb exec-out screencap -p > "${RUNNER_TEMP:-/tmp}/flare-native-start.png"
-adb shell input tap 1420 785
-
-character_open=0
-for attempt in $(seq 1 28); do
-  sleep 3
-  adb logcat -d -v time > "$LOGFILE"
-  if grep -q 'FlarePort QA: character creator opened' "$LOGFILE"; then
-    character_open=1
-    break
-  fi
-  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
-    echo 'Game crashed while opening the character screen.' >&2
-    exit 1
-  fi
-done
-
-adb exec-out screencap -p > "${RUNNER_TEMP:-/tmp}/flare-character-creation.png"
-if [[ "$character_open" != 1 ]]; then
-  echo 'Touching Играть did not open original character creation.' >&2
-  grep -E 'FlarePort QA|FlarePort|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -100 >&2 || true
-  exit 1
-fi
-
-# Verify first-run app-scoped config contains the intended Russian touch controls.
-APPFILES='/sdcard/Android/data/com.kalandos240.flareempyrean/files'
-adb shell "test -f '$APPFILES/config/flare-game/settings.txt'"
-adb shell "test -d '$APPFILES/userdata/saves'"
-adb shell "cat '$APPFILES/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
-adb shell "cat '$APPFILES/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
-
-echo 'Touch test passed: Play button opened the original character creator.' 
-echo 'Flare: Empyrean Campaign native engine started with the real campaign on Android emulator.'
-# Scale the Play button position in the original main menu to any display size.
+# Capture the original title, then tap "Играть" using coordinates
+# normalized to the emulator screenshot's *actual* pixel dimensions.
 DIAGNOSTICS="${RUNNER_TEMP:-/tmp}"
 TITLE_SCREEN="$DIAGNOSTICS/flare-native-start.png"
-AFTER_PLAY="$DIAGNOSTICS/flare-after-play.png"
+CHARACTER_SCREEN="$DIAGNOSTICS/flare-character-creation.png"
 adb exec-out screencap -p > "$TITLE_SCREEN"
+
 read -r tap_x tap_y < <(python - "$TITLE_SCREEN" <<'PY'
 import struct
 import sys
@@ -107,35 +74,60 @@ width, height = struct.unpack(">II", header[16:24])
 print(round(width * 0.607), round(height * 0.725))
 PY
 )
-echo "Tapping original Play button at $tap_x,$tap_y"
+echo "Touching Flare Play button at $tap_x, $tap_y"
 adb shell input touchscreen tap "$tap_x" "$tap_y"
-sleep 10
-adb exec-out screencap -p > "$AFTER_PLAY"
-python scripts/assert_screen_change.py "$TITLE_SCREEN" "$AFTER_PLAY"
-adb logcat -d -v time > "$LOGFILE"
-if grep -E 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
-  echo 'Game crashed during Play-menu navigation.' >&2
+
+character_open=0
+for attempt in $(seq 1 30); do
+  sleep 3
+  adb logcat -d -v time > "$LOGFILE"
+  if grep -q 'FlarePort QA: character creator opened' "$LOGFILE"; then
+    character_open=1
+    break
+  fi
+  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+    echo 'Game crashed while opening the character creator.' >&2
+    exit 1
+  fi
+done
+
+adb exec-out screencap -p > "$CHARACTER_SCREEN"
+if [[ "$character_open" != 1 ]]; then
+  echo 'Touching Play did not open the original character creator.' >&2
+  grep -E 'FlarePort QA|FlarePort|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -100 >&2 || true
   exit 1
 fi
+python scripts/assert_screen_change.py "$TITLE_SCREEN" "$CHARACTER_SCREEN"
 adb shell pidof "$PACKAGE" >/dev/null
 
-# Original game assets and configuration must be under the app-scoped directory.
+# Confirm the installed campaign and Russian touchscreen settings.
 DATA="/sdcard/Android/data/$PACKAGE/files"
 adb shell "test -f '$DATA/mods/mods.txt' && test -d '$DATA/mods/empyrean_campaign'"
+adb shell "test -d '$DATA/userdata/saves'"
 adb shell "test -f '$DATA/config/flare-game/settings.txt'"
-adb shell "test -f '$DATA/.installed-empyrean-2026-10-11-v2'"
-MARKER_BEFORE="$(adb shell stat -c '%Y' "$DATA/.installed-empyrean-2026-10-11-v2" | tr -d '\r')"
+adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^language=ru$'
+adb shell "cat '$DATA/config/flare-game/settings.txt'" | tr -d '\r' | grep -q '^touch_controls=1$'
+
+# A second launch must not re-extract the campaign or reset user data.
+MARKER="$DATA/.installed-empyrean-2026-10-11-v2"
+adb shell "test -f '$MARKER'"
+MARKER_BEFORE="$(adb shell stat -c '%Y' "$MARKER" | tr -d '\r')"
 adb shell am force-stop "$PACKAGE"
 adb shell am start -W -n "$PACKAGE/$ACTIVITY"
 sleep 20
 adb shell pidof "$PACKAGE" >/dev/null
-MARKER_AFTER="$(adb shell stat -c '%Y' "$DATA/.installed-empyrean-2026-10-11-v2" | tr -d '\r')"
+MARKER_AFTER="$(adb shell stat -c '%Y' "$MARKER" | tr -d '\r')"
 if [[ "$MARKER_BEFORE" != "$MARKER_AFTER" ]]; then
-  echo 'Reopening the game unexpectedly reinstalled campaign data.' >&2
+  echo 'Reopening Flare unexpectedly re-extracted campaign assets.' >&2
   exit 1
 fi
 adb exec-out screencap -p > "$DIAGNOSTICS/flare-relaunch.png"
+adb logcat -d -v time > "$LOGFILE"
+if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+  echo 'Game crashed after relaunch.' >&2
+  exit 1
+fi
 
-echo 'Android touch Play navigation and asset re-launch persistence succeeded.'
-echo 'Savegame, combat and character creation still require gameplay QA.'
-
+echo 'Flare touchscreen Play opened the original character creator.'
+echo 'Campaign assets and language/touchscreen config persisted through relaunch.'
+echo 'Gameplay, combat, character saves still need further automated or device QA.'
