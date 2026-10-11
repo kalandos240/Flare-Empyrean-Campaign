@@ -1,0 +1,88 @@
+name: Android RuStore port
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - port/rustore-android-foundation
+    paths:
+      - '.github/workflows/android.yml'
+      - 'scripts/**'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout port scripts
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test packaging logic
+        run: python -m unittest discover -s tests -v
+
+      - name: Install JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: '**/gradle/wrapper/gradle-wrapper.properties'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK and platform
+        run: |
+          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned upstream Flare engine and campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          git init upstream/flare-engine
+          git -C upstream/flare-engine remote add origin https://github.com/flareteam/flare-engine.git
+          git -C upstream/flare-engine fetch --depth 1 origin 1969baeb89ebf94cf22e2bc2ed4e3d8413714d4f
+          git -C upstream/flare-engine checkout --detach FETCH_HEAD
+          git -C upstream/flare-engine submodule update --init --recursive
+
+          git init upstream/flare-game
+          git -C upstream/flare-game remote add origin https://github.com/flareteam/flare-game.git
+          git -C upstream/flare-game fetch --depth 1 origin af6eee6d339ac98011864bfe89da837fe7769c28
+          git -C upstream/flare-game checkout --detach FETCH_HEAD
+
+      - name: Prepare Android sources and bundled Empyrean Campaign
+        run: |
+          python scripts/prepare_android.py \
+            --engine upstream/flare-engine \
+            --game upstream/flare-game
+
+      - name: Build unsigned release bundle and debug APK
+        working-directory: upstream/flare-engine/flare-android-project
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.daemon=false'
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug :app:bundleRelease --stacktrace
+
+      - name: Upload debug install and unsigned AAB
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flare-empyrean-android-unsigned
+          path: |
+            upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/*.apk
+            upstream/flare-engine/flare-android-project/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
