@@ -32,6 +32,24 @@ def instrument(source_dir: Path) -> None:
         '{\n\tsecond_timer.setDuration(settings->max_frames_per_sec);',
         '{\n\tUtils::logInfo("FlarePort QA: gameplay state constructed");\n\tsecond_timer.setDuration(settings->max_frames_per_sec);',
     )
+    # Only the emulator test build gets an exported receiver for its own files.
+    # Scoped Android/data cannot be inspected by adb shell on Android 11+.
+    project = source_dir / "flare-android-project/app/src/main"
+    test_receiver = Path(__file__).resolve().parents[1] / "android/QaReceiver.java"
+    target_receiver = project / "java/org/flare/app/QaReceiver.java"
+    target_receiver.write_text(test_receiver.read_text(encoding="utf-8"), encoding="utf-8")
+    manifest = project / "AndroidManifest.xml"
+    manifest_text = manifest.read_text(encoding="utf-8")
+    receiver_tag = '''        <receiver android:name="org.flare.app.QaReceiver"
+            android:exported="true" />
+'''
+    if manifest_text.count("    </application>") != 1:
+        raise ValueError("Cannot add test receiver to Flare Android manifest")
+    manifest.write_text(
+        manifest_text.replace("    </application>", receiver_tag + "    </application>"),
+        encoding="utf-8",
+    )
+
 
     # The intro cutscene must *finish* before we claim playable gameplay.
     # This diagnostic marker is never injected into production APK/AAB builds.
