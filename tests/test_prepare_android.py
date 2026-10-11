@@ -44,6 +44,7 @@ class PrepareAndroidTests(unittest.TestCase):
             (game / "mods/empyrean_campaign").mkdir(parents=True)
 
             (app / "build.gradle").write_text("old")
+            (jni / "Application.mk").write_text("APP_ABI := armeabi-v7a arm64-v8a x86 x86_64\n")
             (engine / "src/PlatformAndroid.cpp").write_text(
                 "void Platform::setPaths() { old(); }\nvoid other() {}\n"
             )
@@ -63,8 +64,13 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertEqual(project, engine / "flare-android-project")
             self.assertIn(PACKAGE_ID, (app / "build.gradle").read_text())
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
+            self.assertEqual((jni / "Application.mk").read_text(), "APP_ABI := armeabi-v7a arm64-v8a\n")
             self.assertIn("getExternalFilesDir", (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text())
-            self.assertIn(CONTENT_VERSION, (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text())
+            launcher = (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text()
+            self.assertIn(CONTENT_VERSION, launcher)
+            self.assertIn("campaign-info.properties", launcher)
+            self.assertIn("getUsableSpace()", launcher)
+            self.assertIn("reportProgress(", launcher)
             self.assertNotIn("MANAGE_EXTERNAL_STORAGE", (app / "src/main/AndroidManifest.xml").read_text())
             self.assertNotIn("WRITE_EXTERNAL_STORAGE", (app / "src/main/AndroidManifest.xml").read_text())
             self.assertIn("SDL_AndroidGetExternalStoragePath", (engine / "src/PlatformAndroid.cpp").read_text())
@@ -76,6 +82,13 @@ class PrepareAndroidTests(unittest.TestCase):
 
             with ZipFile(app / "src/main/assets/campaign.zip") as archive:
                 paths = set(archive.namelist())
+                total_bytes = sum(entry.file_size for entry in archive.infolist())
+                props = dict(
+                    line.split("=", 1)
+                    for line in (app / "src/main/assets/campaign-info.properties").read_text().splitlines()
+                )
+                self.assertEqual(int(props["files"]), len(paths))
+                self.assertEqual(int(props["bytes"]), total_bytes)
                 self.assertIn("mods/default/d.txt", paths)
                 self.assertIn("mods/fantasycore/f.txt", paths)
                 self.assertIn("mods/empyrean_campaign/e.txt", paths)
