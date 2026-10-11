@@ -101,6 +101,43 @@ fi
 python scripts/assert_screen_change.py "$TITLE_SCREEN" "$CHARACTER_SCREEN"
 adb shell pidof "$PACKAGE" >/dev/null
 
+# Preset heroes have a non-empty default name. Press original "Создать" to
+# exercise the native transition from character creation into gameplay.
+read -r create_x create_y < <(python - "$CHARACTER_SCREEN" <<'PY'
+import struct
+import sys
+with open(sys.argv[1], "rb") as png:
+    png.seek(16)
+    width, height = struct.unpack(">II", png.read(8))
+print(round(width * 0.337), round(height * 0.908))
+PY
+)
+echo "Creating the default hero by touch at $create_x, $create_y"
+adb shell input touchscreen tap "$create_x" "$create_y"
+gameplay_open=0
+for attempt in $(seq 1 35); do
+  sleep 3
+  adb logcat -d -v time > "$LOGFILE"
+  if grep -q 'FlarePort QA: gameplay state constructed' "$LOGFILE"; then
+    gameplay_open=1
+    break
+  fi
+  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+    echo 'Android game crashed during character creation.' >&2
+    exit 1
+  fi
+done
+if [[ "$gameplay_open" != 1 ]]; then
+  echo 'Original Create button did not construct the gameplay state.' >&2
+  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -95 >&2 || true
+  exit 1
+fi
+sleep 12
+adb exec-out screencap -p > "$DIAGNOSTICS/flare-gameplay.png"
+adb shell pidof "$PACKAGE" >/dev/null
+echo 'Original character created and native gameplay state constructed.'
+
+
 # Original character creation pre-fills a valid random name and class.
 # The Create button is at roughly 33.7%, 91% of the same Pixel 5 screenshot.
 echo "Touching character Create at $create_x, $create_y"
