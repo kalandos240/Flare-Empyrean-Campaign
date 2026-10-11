@@ -103,6 +103,7 @@ jobs:
             ${{ runner.temp }}/flare-native-start.png
             ${{ runner.temp }}/flare-character-creation.png
             ${{ runner.temp }}/flare-gameplay.png
+            ${{ runner.temp }}/flare-gameplay.png
             ${{ runner.temp }}/flare-after-play.png
             ${{ runner.temp }}/flare-relaunch.png
             ${{ runner.temp }}/flare-android-smoke.log
