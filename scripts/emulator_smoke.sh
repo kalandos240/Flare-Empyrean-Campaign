@@ -146,6 +146,9 @@ with open(sys.argv[1], 'rb') as image:
 print(round(width * .978), round(height * .04))
 PY
 )
+# The title screen also creates an empty intro cutscene; discard its old logs.
+# Otherwise that earlier completion could make this check pass after a single tap.
+adb logcat -c
 intro_finished=0
 for page in $(seq 1 16); do
   echo "Advancing backstory page $page via native touchscreen arrow"
