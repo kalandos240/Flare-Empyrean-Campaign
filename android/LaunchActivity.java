@@ -9,10 +9,15 @@ import android.widget.TextView;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -57,6 +62,27 @@ public final class LaunchActivity extends Activity {
             }
         }, "flare-assets-installer");
         worker.start();
+    }
+
+    /** A marker with the right length but wrong content cannot authorize skipping extraction. */
+    private static boolean isCurrentInstall(File marker) {
+        byte[] expected = DATA_VERSION.getBytes(StandardCharsets.UTF_8);
+        if (!marker.isFile() || marker.length() != expected.length) {
+            return false;
+        }
+        try (FileInputStream input = new FileInputStream(marker)) {
+            byte[] actual = new byte[expected.length];
+            int position = 0;
+            while (position < actual.length) {
+                int read = input.read(actual, position, actual.length - position);
+                if (read < 0) return false;
+                position += read;
+            }
+            return input.read() == -1 && Arrays.equals(expected, actual);
+        } catch (IOException error) {
+            Log.w(TAG, "Damaged game installation marker; reinstalling assets", error);
+            return false;
+        }
     }
 
     private Properties readManifest() throws IOException {
@@ -110,8 +136,7 @@ public final class LaunchActivity extends Activity {
         File marker = new File(root, ".installed-" + DATA_VERSION);
         File mods = new File(root, "mods");
         // A crash during marker creation must not masquerade as a full install.
-        if (marker.isFile()
-                && marker.length() == DATA_VERSION.length()
+        if (isCurrentInstall(marker)
                 && new File(mods, "mods.txt").isFile()
                 && new File(mods, "game.txt").isFile()
                 && new File(mods, "default").isDirectory()
@@ -130,7 +155,8 @@ public final class LaunchActivity extends Activity {
         } catch (NumberFormatException e) {
             throw new IOException("Повреждён список игровых ресурсов", e);
         }
-        if (totalFiles <= 0 || requiredBytes <= 0) {
+        if (totalFiles <= 0 || requiredBytes <= 0
+                || requiredBytes > Long.MAX_VALUE - EXTRA_FREE_BYTES) {
             throw new IOException("Некорректный размер игровых ресурсов");
         }
 
@@ -145,6 +171,8 @@ public final class LaunchActivity extends Activity {
         final String rootPrefix = root.getCanonicalPath() + File.separator;
         byte[] buffer = new byte[64 * 1024];
         int extractedFiles = 0;
+        long extractedBytes = 0L;
+        Set<String> seenEntries = new HashSet<>();
 
         // A failed/incomplete extraction never receives the completion marker.
         if (marker.exists() && !marker.delete()) {
@@ -156,6 +184,9 @@ public final class LaunchActivity extends Activity {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 String entryName = entry.getName();
+                if (!seenEntries.add(entryName)) {
+                    throw new IOException("Повторяющийся ресурс в архиве: " + entryName);
+                }
                 // Campaign data may only populate these app-owned directories.
                 if (!entryName.startsWith("mods/")
                         && !entryName.startsWith("licenses/")) {
@@ -175,14 +206,43 @@ public final class LaunchActivity extends Activity {
                     if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
                         throw new IOException("Не удалось создать каталог " + parent);
                     }
-                    try (BufferedOutputStream output =
-                             new BufferedOutputStream(new FileOutputStream(destination))) {
-                        int count;
-                        while ((count = zip.read(buffer)) != -1) {
-                            output.write(buffer, 0, count);
+                    // Never overwrite a valid installed asset with half an
+                    // extracted file if Android kills the process or disk fills.
+                    File pending = new File(parent, destination.getName() + ".flare-installing");
+                    if (!pending.getCanonicalPath().startsWith(rootPrefix)) {
+                        throw new IOException("Недопустимый путь временного ресурса");
+                    }
+                    boolean committed = false;
+                    long fileBytes = 0L;
+                    try {
+                        try (BufferedOutputStream output =
+                                 new BufferedOutputStream(new FileOutputStream(pending))) {
+                            int count;
+                            while ((count = zip.read(buffer)) != -1) {
+                                if (count > requiredBytes - extractedBytes) {
+                                    throw new IOException("Распакованные ресурсы превышают заявленный размер");
+                                }
+                                output.write(buffer, 0, count);
+                                extractedBytes += count;
+                                fileBytes += count;
+                            }
+                        }
+                        if (entry.getSize() >= 0 && fileBytes != entry.getSize()) {
+                            throw new IOException("Неверный размер ресурса: " + entryName);
+                        }
+                        if (!pending.renameTo(destination)) {
+                            throw new IOException("Не удалось установить ресурс: " + entryName);
+                        }
+                        committed = true;
+                    } finally {
+                        if (!committed && pending.exists() && !pending.delete()) {
+                            Log.w(TAG, "Unable to clean incomplete resource: " + pending);
                         }
                     }
                     extractedFiles++;
+                    if (extractedFiles > totalFiles) {
+                        throw new IOException("Игровой архив содержит лишние файлы");
+                    }
                     if (extractedFiles % 32 == 0 || extractedFiles == totalFiles) {
                         reportProgress(extractedFiles, totalFiles);
                     }
@@ -191,7 +251,7 @@ public final class LaunchActivity extends Activity {
             }
         }
 
-        if (extractedFiles != totalFiles
+        if (extractedFiles != totalFiles || extractedBytes != requiredBytes
                 || !new File(mods, "mods.txt").isFile()
                 || !new File(mods, "game.txt").isFile()
                 || !new File(mods, "default").isDirectory()

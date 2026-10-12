@@ -56,6 +56,14 @@ Android version and reproducible issues in a GitHub issue.
 - The preceding [emulator run #38179949594](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38179949594) failed during cutscene progression (before joystick testing). The successful replacement now records genuine Next-button acceptance and captures screenshots when a slow emulator is delayed.
 - **Still open:** touch attacks, skill actions, inventory and quest UI, combat, real-device ARM testing, audio lifecycle, full progression and store signing/publication. A passing emulator movement test does not imply these areas have been certified.
 
+## Asset installer hardening (2026-10-12)
+
+- The install marker is checked by **exact UTF-8 version contents**, not only by its filename and byte length. A corrupted or mismatched marker causes asset reinstallation.
+- Each asset is first unpacked to a same-directory `.flare-installing` file, then renamed into place after the ZIP entry finishes. An interrupted or out-of-space extraction cannot leave a half-written *destination file* for that entry. An interrupted whole update still needs another installation pass; this is not a transaction for the entire campaign.
+- The installer rejects duplicate ZIP entry names and ensures the total number of files **and actual decompressed byte count** equal the bundled manifest. Unexpected size growth fails before a completion marker is written.
+- Emulator-only `QaReceiver.inspect` now checks that no temporary asset remains after successful first installation. The receiver remains prohibited in release APKs.
+- These checks are **not** a physical-device certification. Test low-disk-space interruption and interrupted updates on a disposable device.
+
 ## First launch and filesystem
 
 - [ ] Start with a clean installation. Confirm that the Russian progress screen

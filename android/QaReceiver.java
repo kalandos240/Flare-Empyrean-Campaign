@@ -55,7 +55,9 @@ public final class QaReceiver extends BroadcastReceiver {
             }
 
             if ("inspect".equals(op)) {
-                Log.i(TAG, "QA inspect PASS; app-specific game data and settings readable");
+                checkNoIncompleteAssets(mods);
+                checkNoIncompleteAssets(new File(root, "licenses"));
+                Log.i(TAG, "QA inspect PASS; app-specific game data and settings readable, no partial files");
             } else if ("prepare".equals(op)) {
                 File testFile = new File(saves, ".flare-ci-persistence-test");
                 write(testFile, SENTINEL + "|" + marker.lastModified(), false);
@@ -96,6 +98,22 @@ public final class QaReceiver extends BroadcastReceiver {
             }
         } catch (Exception error) {
             Log.e(TAG, "QA " + op + " FAIL", error);
+        }
+    }
+
+    /** Ensure the installer committed every extracted file on a clean install. */
+    private static void checkNoIncompleteAssets(File directory) {
+        File[] children = directory.listFiles();
+        if (children == null) {
+            throw new IllegalStateException("Cannot inspect installed assets: " + directory);
+        }
+        for (File child : children) {
+            if (child.getName().endsWith(".flare-installing")) {
+                throw new IllegalStateException("Incomplete asset remains: " + child);
+            }
+            if (child.isDirectory()) {
+                checkNoIncompleteAssets(child);
+            }
         }
     }
 
