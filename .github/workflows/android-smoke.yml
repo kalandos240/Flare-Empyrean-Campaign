@@ -105,13 +105,9 @@ jobs:
           profile: pixel_5
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -partition-size 8192
           disable-animations: true
-          script: |
-            if [[ "${{ matrix.api_level }}" == "26" ]]; then
-              FLARE_SMOKE_CREATOR_ONLY=1 bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
-            else
-              bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
-            fi
-            echo "Android API ${{ matrix.api_level }} native engine test completed."
+          # android-emulator-runner executes script through /bin/sh; keep this
+          # a single shell command (multi-line if blocks are split by the runner).
+          script: FLARE_SMOKE_CREATOR_ONLY=${{ matrix.api_level == 26 && '1' || '0' }} bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload emulator screenshot and logs
         if: always()
