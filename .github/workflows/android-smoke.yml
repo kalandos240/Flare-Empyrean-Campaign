@@ -12,6 +12,7 @@ on:
       - 'scripts/emulator_smoke.sh'
       - 'scripts/emulator_load_test.sh'
       - 'scripts/emulator_movement_test.sh'
+      - 'scripts/emulator_menus_test.sh'
       - 'scripts/emulator_hud_test.sh'
       - 'scripts/emulator_back_test.sh'
       - 'scripts/emulator_death_test.sh'
@@ -136,6 +137,8 @@ jobs:
             ${{ runner.temp }}/flare-inventory-closed.png
             ${{ runner.temp }}/flare-combat-touch.png
             ${{ runner.temp }}/flare-hud-test.log
+            ${{ runner.temp }}/flare-menus-test.log
+            ${{ runner.temp }}/flare-menu-*.png
             ${{ runner.temp }}/flare-back-pause.png
             ${{ runner.temp }}/flare-back-resume.png
             ${{ runner.temp }}/flare-back-test.log

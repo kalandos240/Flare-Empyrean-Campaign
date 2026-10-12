@@ -152,6 +152,26 @@ def instrument(source_dir: Path) -> None:
         '\t\t}\n',
     )
 
+    # Native action bar has distinct character, powers and quest-log screens.
+    # Observe transitions using the real menu visibility flags.
+    inject(
+        src / "MenuManager.cpp",
+        '\t\tqa_inventory_was_visible = inv->visible;\n',
+        '\t\tqa_inventory_was_visible = inv->visible;\n'
+        '\t\tstatic bool qa_character_seen = false;\n'
+        '\t\tstatic bool qa_powers_seen = false;\n'
+        '\t\tstatic bool qa_questlog_seen = false;\n'
+        '\t\tif (chr->visible != qa_character_seen)\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: character panel %s", chr->visible ? "opened" : "closed");\n'
+        '\t\tif (pow->visible != qa_powers_seen)\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: powers panel %s", pow->visible ? "opened" : "closed");\n'
+        '\t\tif (questlog->visible != qa_questlog_seen)\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: questlog panel %s", questlog->visible ? "opened" : "closed");\n'
+        '\t\tqa_character_seen = chr->visible;\n'
+        '\t\tqa_powers_seen = pow->visible;\n'
+        '\t\tqa_questlog_seen = questlog->visible;\n',
+    )
+
     # These logs prove that the original touch HUD can open the actual
     # inventory and enqueue a normal primary/secondary combat action.
     inject(

@@ -261,6 +261,17 @@ class PrepareAndroidTests(unittest.TestCase):
         self.assertIn('bash scripts/emulator_death_test.sh', (root / "scripts/emulator_smoke.sh").read_text())
         self.assertIn('flare-death-screen.png', workflow)
 
+    def test_original_menu_buttons_are_covered(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts/emulator_menus_test.sh").read_text()
+        instrument = (root / "scripts/emulator_instrument.py").read_text()
+        self.assertIn("character panel %s", instrument)
+        self.assertIn("powers panel %s", instrument)
+        self.assertIn("questlog panel %s", instrument)
+        for menu in ("character", "powers", "questlog"):
+            self.assertIn(menu, script)
+        self.assertIn("bash scripts/emulator_menus_test.sh", (root / "scripts/emulator_smoke.sh").read_text())
+
     def test_manifest_launch_is_exported_and_sdl_is_private(self):
         self.assertIn('android:name="org.flare.app.LaunchActivity"', MANIFEST)
         self.assertIn('android:exported="true"', MANIFEST)

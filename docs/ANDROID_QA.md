@@ -168,3 +168,9 @@ steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpt
 - Emulator-only `QaReceiver` requests a one-shot defeat via an app-owned marker. Emulator-only engine C++ sets native hero HP to zero; the actual Avatar death animation and original Game Over menu then execute without production patches.
 - A successful test requires an original Game Over visibility marker, live native process and screenshot `flare-death-screen.png`. This is **not** a substitute for enemy-hit, balance or all-quest gameplay QA.
 - All diagnostic code and the marker receiver are excluded from production ARM builds. The saved character file is not modified by the death trigger.
+
+## Main gameplay HUD menus (emulator regression, not certified yet)
+
+- API 30 now taps the original lower toolbar's **character**, **powers/research** and **quest log** icons after loading and moving a saved hero, then taps each again to close it. The existing inventory script separately checks its own icon and rendering.
+- Emulator-only engine markers assert the *actual* native visibility flags for each opening and closing. Screenshots and `flare-menus-test.log` aid UI layout diagnosis.
+- Combat target selection, merchants, dialogue trees, quest completion and every skill effect still require separate gameplay checks; a passed menu check does not cover these systems.

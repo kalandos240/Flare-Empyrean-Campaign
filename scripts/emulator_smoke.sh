@@ -302,6 +302,7 @@ echo 'The native avatar save was written on Android Home and preserved after rel
 echo 'Next: load this saved character through Flare original menu.'
 bash scripts/emulator_load_test.sh
 bash scripts/emulator_movement_test.sh
+bash scripts/emulator_menus_test.sh
 bash scripts/emulator_hud_test.sh
 bash scripts/emulator_back_test.sh
 bash scripts/emulator_death_test.sh
