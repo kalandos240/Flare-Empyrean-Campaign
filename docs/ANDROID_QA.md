@@ -56,6 +56,13 @@ Android version and reproducible issues in a GitHub issue.
 - [ ] Confirm saves are under `userdata/saves` and options are under
       `config/flare-game`. These directories must not be overwritten by updating assets.
 
+## Touch-control regression status (2026-10-12)
+
+- [Joystick smoke #38179949594](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38179949594) did **not** reach the movement assertions: the emulator stopped during the original introductory cutscene, before loading a saved character. Do not treat this failure as proof of a broken joystick.
+- The current emulator diagnostics instrument the **real** Next-button click handler, count accepted cutscene taps, and preserve `flare-intro-progress.png` / `flare-intro-stuck.png` screenshots if it stalls.
+- The dedicated movement scenario drags the original left-side virtual joystick after loading the saved hero and requires both native directional input and a measured change in `Avatar::stats.pos`. A passing saved-game load alone does **not** validate movement.
+- The RuStore production build has a CI guard against including the emulator-only exported `QaReceiver`. This test bridge is **never intended for distribution**.
+
 ## Gameplay and touch
 
 - [ ] Create a character, enter the campaign, move using the on-screen control.
