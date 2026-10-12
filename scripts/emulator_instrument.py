@@ -82,6 +82,26 @@ def instrument(source_dir: Path) -> None:
         '\t\t}\n',
     )
 
+    # These logs prove that the original touch HUD can open the actual
+    # inventory and enqueue a normal primary/secondary combat action.
+    inject(
+        src / "MenuManager.cpp",
+        '\tmenus_open = (inv->visible || pow->visible || chr->visible || questlog->visible || vendor->visible || talker->visible || book->visible || console_open);',
+        '\tmenus_open = (inv->visible || pow->visible || chr->visible || questlog->visible || vendor->visible || talker->visible || book->visible || console_open);\n'
+        '\tstatic bool qa_inventory_ever_opened = false;\n'
+        '\tif (inv->visible && !qa_inventory_ever_opened) {\n'
+        '\t\tqa_inventory_ever_opened = true;\n'
+        '\t\tUtils::logInfo("FlarePort QA: original inventory menu opened");\n'
+        '\t}\n',
+    )
+    inject(
+        src / "MenuActionBar.cpp",
+        '\t\t\t\taction_queue.push_back(action);',
+        '\t\t\t\tif (i == 10 || i == 11)\n'
+        '\t\t\t\t\tUtils::logInfo("FlarePort QA: touch combat action queued for slot %u", i);\n'
+        '\t\t\t\taction_queue.push_back(action);',
+    )
+
     # Only the emulator test build gets an exported receiver for its own files.
     # Scoped Android/data cannot be inspected by adb shell on Android 11+.
     project = source_dir / "flare-android-project/app/src/main"
