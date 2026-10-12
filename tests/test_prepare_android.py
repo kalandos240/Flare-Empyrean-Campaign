@@ -60,6 +60,9 @@ class PrepareAndroidTests(unittest.TestCase):
             )
             (engine / "src/MenuTouchControls.cpp").write_text("upstream touch implementation")
             (engine / "src/MenuTouchControls.h").write_text("upstream touch header")
+            (engine / "src/GameStateTitle.cpp").write_text(
+                "label_version->setText(VersionInfo::createVersionStringFull());\n"
+            )
             (engine / "src/PlatformAndroid.cpp").write_text(
                 "void Platform::setPaths() { old(); }\nvoid other() {}\n"
             )
@@ -80,6 +83,11 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn(PACKAGE_ID, (app / "build.gradle").read_text())
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
             self.assertIn("minSdk 26", (app / "build.gradle").read_text())
+            self.assertIn("versionCode 2", (app / "build.gradle").read_text())
+            self.assertIn("versionName '0.2.0'", (app / "build.gradle").read_text())
+            self.assertIn('label_version->setText("Android 8.0+")',
+                          (engine / "src/GameStateTitle.cpp").read_text())
+
             self.assertNotIn("minSdk 24", (app / "build.gradle").read_text())
             self.assertEqual((jni / "Application.mk").read_text(), "APP_ABI := armeabi-v7a arm64-v8a\n")
             prepare(engine, game, abis="x86_64")

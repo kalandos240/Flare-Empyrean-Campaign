@@ -10,7 +10,7 @@ LOGFILE="${RUNNER_TEMP:-/tmp}/flare-android-smoke.log"
 adb wait-for-device
 adb shell settings put system screen_off_timeout 1800000 || true
 adb install -r "$APK"
-adb logcat -c
+adb logcat -c || true
 adb shell am start -W -n "$PACKAGE/$ACTIVITY"
 
 seen_native=0

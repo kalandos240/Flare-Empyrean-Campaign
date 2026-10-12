@@ -174,3 +174,9 @@ steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpt
 - API 30 now taps the original lower toolbar's **character**, **powers/research** and **quest log** icons after loading and moving a saved hero, then taps each again to close it. The existing inventory script separately checks its own icon and rendering.
 - Emulator-only engine markers assert the *actual* native visibility flags for each opening and closing. Screenshots and `flare-menus-test.log` aid UI layout diagnosis.
 - Combat target selection, merchants, dialogue trees, quest completion and every skill effect still require separate gameplay checks; a passed menu check does not cover these systems.
+
+## Android-only title and minimum-device compatibility
+
+- The original in-game title's engine/platform version label is replaced during the Android packaging step with `Android 8.0+`. This does not modify the original source credits or open-source licenses.
+- The app release candidate now uses Android `versionCode 2` / `versionName 0.2.0`; package identifier remains identical, allowing normal update installation over 0.1.0 (saves remain in app-owned storage).
+- The emulator startup script treats a transient `adb logcat -c` failure on API 26 as nonfatal but still requires actual native startup/gameplay markers and checks for crashes. This addresses the previous Android 8 CI failure at log clearing.

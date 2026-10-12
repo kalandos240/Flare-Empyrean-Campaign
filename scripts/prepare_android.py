@@ -27,8 +27,8 @@ android {
         applicationId 'com.kalandos240.flareempyrean'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0'
+        versionCode 2
+        versionName '0.2.0'
     }
 
     sourceSets {
@@ -158,6 +158,23 @@ def patch_sdl_makefiles(jni: Path) -> None:
                 content,
             )
         makefile.write_text(content, encoding="utf-8")
+
+def patch_android_title_branding(engine: Path) -> None:
+    """Keep the in-game title mobile-specific; never alter license credits."""
+    title_file = engine / "src/GameStateTitle.cpp"
+    if not title_file.is_file():
+        raise FileNotFoundError(f"Missing native title screen: {title_file}")
+    source = title_file.read_text(encoding="utf-8")
+    desktop_version = "label_version->setText(VersionInfo::createVersionStringFull());"
+    mobile_version = 'label_version->setText("Android 8.0+");'
+    if desktop_version in source:
+        if source.count(desktop_version) != 1:
+            raise ValueError("Unexpected original game title layout")
+        source = source.replace(desktop_version, mobile_version)
+        title_file.write_text(source, encoding="utf-8")
+    elif mobile_version not in source:
+        raise ValueError("Cannot find title version field in pinned Flare engine")
+
 
 def patch_android_touch_controls(engine: Path) -> None:
     """Use finger-specific floating controls only in this Android port."""
@@ -455,6 +472,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     gameplay.write_text(gameplay_source, encoding="utf-8")
 
     patch_android_touch_controls(engine)
+    patch_android_title_branding(engine)
     patch_sdl_makefiles(app / "src/main/jni")
 
     # Store defaults to ARM ABIs; --abis x86_64 enables separate emulator smoke builds.
