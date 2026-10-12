@@ -104,6 +104,8 @@ jobs:
           name: flare-emulator-diagnostics
           path: |
             ${{ runner.temp }}/flare-native-start.png
+            ${{ runner.temp }}/flare-title-not-ready.png
+            ${{ runner.temp }}/flare-play-attempt-*.png
             ${{ runner.temp }}/flare-character-creation.png
             ${{ runner.temp }}/flare-intro.png
             ${{ runner.temp }}/flare-intro-progress.png

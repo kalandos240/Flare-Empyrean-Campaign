@@ -17,6 +17,27 @@ def inject(path: Path, anchor: str, replacement: str) -> None:
 
 def instrument(source_dir: Path) -> None:
     src = source_dir / "src"
+
+    # Emulator-only markers: distinguish a rendered title, accepted Play click
+    # and a failing game-state transition. No QA hooks ship in the RuStore APK.
+    inject(
+        src / "GameStateTitle.cpp",
+        "void GameStateTitle::render() {\n",
+        'void GameStateTitle::render() {\n'
+        '\tstatic bool qa_title_render_logged = false;\n'
+        '\tif (!qa_title_render_logged) {\n'
+        '\t\tqa_title_render_logged = true;\n'
+        '\t\tUtils::logInfo("FlarePort QA: original title screen rendered");\n'
+        '\t}\n',
+    )
+    inject(
+        src / "GameStateTitle.cpp",
+        '\t\tbool play_clicked = button_play->checkClick();\n',
+        '\t\tbool play_clicked = button_play->checkClick();\n'
+        '\t\tif (play_clicked)\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: original title Play accepted");\n',
+    )
+
     inject(
         src / "GameStateNew.cpp",
         '{\n\t// set up buttons\n',

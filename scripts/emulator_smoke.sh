@@ -38,11 +38,26 @@ if [[ "$seen_native" != 1 ]]; then
   exit 1
 fi
 
-sleep 12
-adb logcat -d -v time > "$LOGFILE"
-if grep -E 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
-  echo "Native initialization started but an Android crash followed." >&2
-  grep -n -A 25 -B 5 -E 'FATAL EXCEPTION|Fatal signal' "$LOGFILE" | tail -120 >&2 || true
+# The mod-loader log precedes the actual rendered title on some cold boots.
+# Do not send synthetic input until the native title has drawn at least once.
+title_ready=0
+for attempt in $(seq 1 40); do
+  sleep 3
+  adb logcat -d -v time > "$LOGFILE"
+  if grep -q 'FlarePort QA: original title screen rendered' "$LOGFILE"; then
+    title_ready=1
+    break
+  fi
+  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+    echo 'Native initialization crashed before rendering the title.' >&2
+    grep -n -A 25 -B 5 -E 'FATAL EXCEPTION|Fatal signal' "$LOGFILE" | tail -120 >&2 || true
+    exit 1
+  fi
+done
+if [[ "$title_ready" != 1 ]]; then
+  adb exec-out screencap -p > "${RUNNER_TEMP:-/tmp}/flare-title-not-ready.png"
+  echo 'Flare loaded mods, but the original title screen did not render.' >&2
+  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION|Fatal signal' "$LOGFILE" | tail -100 >&2 || true
   exit 1
 fi
 
@@ -75,27 +90,60 @@ print(round(width * 0.607), round(height * 0.725),
       round(width * 0.337), round(height * 0.91))
 PY
 )
-echo "Touching Flare Play button at $tap_x, $tap_y"
-adb shell input touchscreen tap "$tap_x" "$tap_y"
-
+# Some headless emulators drop the first ADB tap on a cold title screen.
+# Retry only if the original engine did NOT accept it. If Play was accepted,
+# wait for character creation rather than sending another click into gameplay.
 character_open=0
-for attempt in $(seq 1 30); do
-  sleep 3
-  adb logcat -d -v time > "$LOGFILE"
-  if grep -q 'FlarePort QA: character creator opened' "$LOGFILE"; then
-    character_open=1
+play_accepted=0
+for play_attempt in $(seq 1 5); do
+  echo "Touching Flare Play ($play_attempt/5) at $tap_x,$tap_y"
+  adb shell input touchscreen tap "$tap_x" "$tap_y"
+  for poll in $(seq 1 10); do
+    sleep 2
+    adb logcat -d -v time > "$LOGFILE"
+    if grep -q 'FlarePort QA: character creator opened' "$LOGFILE"; then
+      character_open=1
+      break
+    fi
+    if grep -q 'FlarePort QA: original title Play accepted' "$LOGFILE"; then
+      play_accepted=1
+    fi
+    if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE" || ! adb shell pidof "$PACKAGE" >/dev/null 2>&1; then
+      echo 'Android game crashed or exited after tapping Play.' >&2
+      exit 1
+    fi
+  done
+
+  if [[ "$character_open" == 1 ]]; then
     break
   fi
-  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
-    echo 'Game crashed while opening the character creator.' >&2
-    exit 1
+  adb exec-out screencap -p > "$DIAGNOSTICS/flare-play-attempt-$play_attempt.png"
+  if [[ "$play_accepted" == 1 ]]; then
+    echo 'Native Play handler accepted input; waiting for a slow state transition.'
+    for poll in $(seq 1 10); do
+      sleep 2
+      adb logcat -d -v time > "$LOGFILE"
+      if grep -q 'FlarePort QA: character creator opened' "$LOGFILE"; then
+        character_open=1
+        break
+      fi
+      if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
+        echo 'Game crashed after Play was accepted.' >&2
+        exit 1
+      fi
+    done
+    break
   fi
+  echo "Engine did not acknowledge ADB Play tap $play_attempt."
 done
-
 adb exec-out screencap -p > "$CHARACTER_SCREEN"
 if [[ "$character_open" != 1 ]]; then
-  echo 'Touching Play did not open the original character creator.' >&2
-  grep -E 'FlarePort QA|FlarePort|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -100 >&2 || true
+  if [[ "$play_accepted" == 1 ]]; then
+    echo 'REGRESSION: native Play accepted but character creation never opened.' >&2
+  else
+    echo 'INPUT FAILURE: title visible but all synthetic Play taps ignored.' >&2
+  fi
+  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -100 >&2 || true
   exit 1
 fi
 python scripts/assert_screen_change.py "$TITLE_SCREEN" "$CHARACTER_SCREEN"

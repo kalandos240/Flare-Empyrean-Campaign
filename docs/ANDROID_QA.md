@@ -10,6 +10,12 @@ that touch gameplay, all assets, and saving work on ARM devices.
 Please test the debug APK on a physical Android phone and record its model,
 Android version and reproducible issues in a GitHub issue.
 
+## Cold-start Play regression (2026-10-12)
+
+- [Emulator run #38246160209](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38246160209) failed at the first synthetic **Играть** tap: all pinned Flare mods loaded, but the test did not observe character creation. It did not report an Android native crash. On the same commit, the ARM package build and optional VK SDK compilation both passed.
+- Emulator-only instrumentation now distinguishes a rendered original title screen, an accepted original Play click, and the subsequent character-creation state. The smoke test waits until the title renders, retries **only unacknowledged** synthetic taps, and uploads screenshots on unsuccessful attempts. Accepted clicks followed by stalled state transitions are reported as regressions, not retried blindly.
+- This diagnostic/test hardening does not by itself prove a gameplay fix. Review the subsequent CI run before considering the test reliable. The production ARM build contains no QA markers.
+
 ## Verified CI evidence (2026-10-11)
 
 - [ARM release/debug build #38157326908](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38157326908) — successful APK and AAB packaging.
