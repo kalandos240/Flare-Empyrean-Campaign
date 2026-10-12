@@ -95,18 +95,18 @@ if (( inventory_closed == 0 )); then
   exit 1
 fi
 
-# The rightmost touch ring is Flare's primary (MAIN1) attack button.
+# The far-right touch ring is Flare's MAIN2 action button (slot 11).
 # An actual normal power being put onto the action queue is verified in C++.
 attack_x=$((width * 925 / 1000))
 attack_y=$((height * 663 / 1000))
-echo "Pressing original primary attack ring at $attack_x,$attack_y"
+echo "Pressing original secondary action ring at $attack_x,$attack_y"
 adb logcat -c
 adb shell input touchscreen tap "$attack_x" "$attack_y"
 action_queued=0
 for attempt in $(seq 1 13); do
   sleep 2
   adb logcat -d -v time > "$LOG"
-  if grep -q 'FlarePort QA: touch combat action queued for slot 10' "$LOG"; then
+  if grep -q 'FlarePort QA: touch combat action queued for slot 11' "$LOG"; then
     action_queued=1
     break
   fi
@@ -117,11 +117,11 @@ for attempt in $(seq 1 13); do
 done
 adb exec-out screencap -p > "$COMBAT"
 if (( action_queued == 0 )); then
-  echo 'Primary touchscreen attack did not enqueue a native power.' >&2
+  echo 'Right virtual action ring did not enqueue its actual slot-11 power.' >&2
   grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOG" | tail -90 >&2 || true
   exit 1
 fi
 
 adb shell pidof "$PACKAGE" >/dev/null
-echo 'PASSED: native touchscreen inventory opened, rendered, closed; primary power queued.'
-echo 'This checks power activation, not combat against a live enemy.'
+echo 'PASSED: original inventory opened, rendered and closed; right-side MAIN2 action queued.'
+echo 'This validates native ability queueing, NOT hitting an actual enemy.'
