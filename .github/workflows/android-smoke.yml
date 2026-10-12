@@ -105,6 +105,8 @@ jobs:
             ${{ runner.temp }}/flare-native-start.png
             ${{ runner.temp }}/flare-character-creation.png
             ${{ runner.temp }}/flare-intro.png
+            ${{ runner.temp }}/flare-intro-progress.png
+            ${{ runner.temp }}/flare-intro-stuck.png
             ${{ runner.temp }}/flare-gameplay.png
             ${{ runner.temp }}/flare-after-play.png
             ${{ runner.temp }}/flare-relaunch.png
