@@ -210,22 +210,33 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     java = app / "src/main/java/org/flare/app"
     java.mkdir(parents=True, exist_ok=True)
 
+    # Always normalize a previously prepared checkout before changing ad mode.
+    # Switching an opt-in VK build back to an offline release must not leave
+    # AndroidX, the myTarget Java imports, or native JNI hooks behind.
+    gradle_properties = project / "gradle.properties"
+    options = gradle_properties.read_text(encoding="utf-8")
+    option_pattern = r"(?m)^android\.useAndroidX=(?:true|false)$"
+    if len(re.findall(option_pattern, options)) != 1:
+        raise ValueError("Expected exactly one upstream AndroidX configuration")
+    options = re.sub(
+        option_pattern,
+        f"android.useAndroidX={'true' if vk_interstitial_slot else 'false'}",
+        options,
+    )
+    gradle_properties.write_text(options, encoding="utf-8")
+
+    ads_source = (Path(__file__).resolve().parents[1] / "android/VkAdsBridge.java").read_text(encoding="utf-8")
+    ads_java = java / "VkAdsBridge.java"
+    if not vk_interstitial_slot and ads_java.exists():
+        if ads_java.read_text(encoding="utf-8") != ads_source:
+            raise ValueError("Refusing to delete a modified VK Ads Java bridge")
+        ads_java.unlink()
+
     gradle_source = APP_GRADLE
     manifest_source = MANIFEST
     activity_source = FLARE_ACTIVITY
     if vk_interstitial_slot:
-        # Opt-in VK SDK 5.52.5 pulls in AndroidX Media3 and AndroidX Core;
-        # upstream Flare explicitly disables AndroidX for its offline build.
-        # Enable it ONLY when myTarget is part of the generated project.
-        gradle_properties = project / "gradle.properties"
-        gradle_options = gradle_properties.read_text(encoding="utf-8")
-        old_option = "android.useAndroidX=false"
-        if gradle_options.count(old_option) != 1:
-            raise ValueError("Expected upstream AndroidX=false project configuration")
-        gradle_properties.write_text(
-            gradle_options.replace(old_option, "android.useAndroidX=true"),
-            encoding="utf-8",
-        )
+        # AndroidX was normalized above for both the offline and opt-in modes.
         # Explicit opt-in only. Default RuStore builds remain free of ad SDK,
         # advertising network permissions, IDs and background initialization.
         gradle_source += (
@@ -261,8 +272,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         )
         # Privacy consent is intentionally not granted automatically:
         # the future consent UI must explicitly call vkAds.setPrivacyReady().
-        ad_bridge = Path(__file__).resolve().parents[1] / "android/VkAdsBridge.java"
-        (java / "VkAdsBridge.java").write_text(ad_bridge.read_text(encoding="utf-8"), encoding="utf-8")
+        ads_java.write_text(ads_source, encoding="utf-8")
 
     (app / "build.gradle").write_text(gradle_source, encoding="utf-8")
     (app / "src/main/AndroidManifest.xml").write_text(manifest_source, encoding="utf-8")
@@ -287,9 +297,35 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         encoding="utf-8",
     )
 
+    # Revert only the exact location of our previously injected native callback.
+    # This makes repeated preparation and ad-on -> ad-off -> ad-on safe.
+    gameplay = engine / "src/GameStatePlay.cpp"
+    gameplay_source = gameplay.read_text(encoding="utf-8")
+    native_header = '#ifdef __ANDROID__\n#include <jni.h>\n#include "SDL_system.h"\n#endif\n'
+    ad_begin = '\t\tsetRequestedGameState(new GameStateTitle());\n#ifdef __ANDROID__\n'
+    ad_end = '\n#endif\n\n\t\tsave_load->setGameSlot(0);'
+    if gameplay_source.count(ad_begin) > 1:
+        raise ValueError("Ambiguous previously injected VK Ads exit callback")
+    if ad_begin in gameplay_source:
+        start = gameplay_source.index(ad_begin)
+        if ad_end not in gameplay_source[start:]:
+            raise ValueError("Incomplete previously injected VK Ads callback")
+        end = gameplay_source.index(ad_end, start) + len(ad_end)
+        injected = gameplay_source[start:end]
+        if 'GetMethodID(clazz, "onGameSessionEnded", "()V")' not in injected:
+            raise ValueError("Refusing to replace an unknown native exit callback")
+        gameplay_source = (
+            gameplay_source[:start]
+            + '\t\tsetRequestedGameState(new GameStateTitle());\n\n\t\tsave_load->setGameSlot(0);'
+            + gameplay_source[end:]
+        )
+        if not gameplay_source.startswith(native_header):
+            raise ValueError("Previously prepared VK callback is missing JNI includes")
+        gameplay_source = gameplay_source[len(native_header):]
+    elif gameplay_source.startswith(native_header):
+        raise ValueError("Orphaned VK Ads JNI include without a known callback")
+
     if vk_interstitial_slot:
-        gameplay = engine / "src/GameStatePlay.cpp"
-        gameplay_source = gameplay.read_text(encoding="utf-8")
         exit_anchor = (
             "\t\tsnd->stopMusic();\n"
             "\t\tshowLoading();\n"
@@ -303,6 +339,8 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "\t\tshowLoading();\n"
             "\t\tsetRequestedGameState(new GameStateTitle());\n"
             "#ifdef __ANDROID__\n"
+            "\t\t// Skip the ad signal if the native game did not save on exit.\n"
+            "\t\tif (save_on_exit) {\n"
             "\t\t// Do not show an ad until AFTER the native session was saved.\n"
             "\t\tJNIEnv* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());\n"
             "\t\tif (env) {\n"
@@ -315,15 +353,14 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "\t\t\t\tenv->DeleteLocalRef(activity);\n"
             "\t\t\t}\n"
             "\t\t}\n"
+            "\t\t}\n"
             "#endif\n"
             "\n\t\tsave_load->setGameSlot(0);"
         )
         gameplay_source = gameplay_source.replace(exit_anchor, android_ad_call)
-        gameplay_source = (
-            '#ifdef __ANDROID__\n#include <jni.h>\n#include "SDL_system.h"\n#endif\n'
-            + gameplay_source
-        )
-        gameplay.write_text(gameplay_source, encoding="utf-8")
+        gameplay_source = native_header + gameplay_source
+
+    gameplay.write_text(gameplay_source, encoding="utf-8")
 
     patch_sdl_makefiles(app / "src/main/jni")
 

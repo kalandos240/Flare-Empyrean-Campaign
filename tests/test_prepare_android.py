@@ -139,6 +139,33 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn('GetMethodID(clazz, "onGameSessionEnded", "()V")', cpp)
             self.assertIn("save_load->setGameSlot(0);", cpp)
             self.assertIn("setPrivacyReady", (app / "src/main/java/org/flare/app/VkAdsBridge.java").read_text())
+            self.assertIn("if (save_on_exit)", cpp)
+
+            # Re-running preparation with the same ad slot must not duplicate
+            # C++ JNI hooks or require a clean checkout.
+            prepare(engine, game, vk_interstitial_slot=314159)
+            cpp = (engine / "src/GameStatePlay.cpp").read_text()
+            self.assertEqual(cpp.count('GetMethodID(clazz, "onGameSessionEnded", "()V")'), 1)
+            self.assertEqual(cpp.count('#include "SDL_system.h"'), 1)
+
+            # Most importantly, turning ads OFF must restore the offline build.
+            prepare(engine, game, vk_interstitial_slot=0)
+            self.assertIn("android.useAndroidX=false", (engine / "flare-android-project/gradle.properties").read_text())
+            self.assertNotIn("mytarget-sdk", (app / "build.gradle").read_text())
+            self.assertNotIn("android.permission.INTERNET", (app / "src/main/AndroidManifest.xml").read_text())
+            self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
+            self.assertNotIn("VkAdsBridge", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
+            self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn('#include "SDL_system.h"', (engine / "src/GameStatePlay.cpp").read_text())
+
+            # And an opted-in build remains possible after an offline one.
+            prepare(engine, game, vk_interstitial_slot=314159)
+            self.assertIn("android.useAndroidX=true", (engine / "flare-android-project/gradle.properties").read_text())
+            self.assertTrue((app / "src/main/java/org/flare/app/VkAdsBridge.java").is_file())
+            self.assertEqual(
+                (engine / "src/GameStatePlay.cpp").read_text().count('GetMethodID(clazz, "onGameSessionEnded", "()V")'),
+                1,
+            )
 
 
     def test_manifest_launch_is_exported_and_sdl_is_private(self):
