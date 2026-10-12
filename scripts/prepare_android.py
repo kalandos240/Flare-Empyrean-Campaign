@@ -361,11 +361,6 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         )
         if yandex_interstitial_unit:
             manifest_source = manifest_source.replace(
-                '        android:label="@string/app_name"',
-                '        <!-- Do not initialize Yandex SDK until an explicit user choice. -->\n'
-                '        android:label="@string/app_name"',
-            )
-            manifest_source = manifest_source.replace(
                 '        <activity android:name="org.flare.app.LaunchActivity"',
                 '        <meta-data android:name="com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION"\n'
                 '            android:value="false" />\n'
