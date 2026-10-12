@@ -294,7 +294,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "\t\t// Do not show an ad until AFTER the native session was saved.\n"
             "\t\tJNIEnv* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());\n"
             "\t\tif (env) {\n"
-            "\t\t\tjobject activity = SDL_AndroidGetActivity();\n"
+            "\t\t\tjobject activity = static_cast<jobject>(SDL_AndroidGetActivity());\n"
             "\t\t\tif (activity) {\n"
             "\t\t\t\tjclass clazz = env->GetObjectClass(activity);\n"
             "\t\t\t\tjmethodID method = env->GetMethodID(clazz, \"onGameSessionEnded\", \"()V\");\n"
