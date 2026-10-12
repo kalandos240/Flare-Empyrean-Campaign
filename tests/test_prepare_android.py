@@ -104,6 +104,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertNotIn("android.permission.INTERNET", default_manifest)
             self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
             self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("onGameSessionStarted", (engine / "src/GameStatePlay.cpp").read_text())
 
             with ZipFile(app / "src/main/assets/campaign.zip") as archive:
                 paths = set(archive.namelist())
@@ -137,6 +138,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertTrue((app / "src/main/java/org/flare/app/VkAdsBridge.java").is_file())
             cpp = (engine / "src/GameStatePlay.cpp").read_text()
             self.assertIn('GetMethodID(clazz, "onGameSessionEnded", "()V")', cpp)
+            self.assertIn('GetMethodID(vk_class, "onGameSessionStarted", "()V")', cpp)
+            self.assertIn("onGameSessionStarted", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("save_load->setGameSlot(0);", cpp)
             self.assertIn("setPrivacyReady", (app / "src/main/java/org/flare/app/VkAdsBridge.java").read_text())
             self.assertIn("if (save_on_exit)", cpp)
@@ -146,6 +149,7 @@ class PrepareAndroidTests(unittest.TestCase):
             prepare(engine, game, vk_interstitial_slot=314159)
             cpp = (engine / "src/GameStatePlay.cpp").read_text()
             self.assertEqual(cpp.count('GetMethodID(clazz, "onGameSessionEnded", "()V")'), 1)
+            self.assertEqual(cpp.count('GetMethodID(vk_class, "onGameSessionStarted", "()V")'), 1)
             self.assertEqual(cpp.count('#include "SDL_system.h"'), 1)
 
             # Most importantly, turning ads OFF must restore the offline build.
@@ -156,6 +160,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
             self.assertNotIn("VkAdsBridge", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("onGameSessionStarted", (engine / "src/GameStatePlay.cpp").read_text())
             self.assertNotIn('#include "SDL_system.h"', (engine / "src/GameStatePlay.cpp").read_text())
 
             # And an opted-in build remains possible after an offline one.
@@ -164,6 +169,10 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertTrue((app / "src/main/java/org/flare/app/VkAdsBridge.java").is_file())
             self.assertEqual(
                 (engine / "src/GameStatePlay.cpp").read_text().count('GetMethodID(clazz, "onGameSessionEnded", "()V")'),
+                1,
+            )
+            self.assertEqual(
+                (engine / "src/GameStatePlay.cpp").read_text().count('GetMethodID(vk_class, "onGameSessionStarted", "()V")'),
                 1,
             )
 

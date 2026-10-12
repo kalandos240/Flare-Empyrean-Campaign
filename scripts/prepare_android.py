@@ -262,6 +262,12 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "        super.onCreate(state);\n"
             f"        vkAds = new VkAdsBridge(this, {vk_interstitial_slot});\n"
             "    }\n"
+            "    /** Begin the ad timer only when native gameplay is entered. */\n"
+            "    public void onGameSessionStarted() {\n"
+            "        runOnUiThread(() -> {\n"
+            "            if (vkAds != null) vkAds.onGameSessionStarted();\n"
+            "        });\n"
+            "    }\n"
             "    /** Called only after the native engine saved an ended game session. */\n"
             "    public void onGameSessionEnded() {\n"
             "        runOnUiThread(() -> {\n"
@@ -302,6 +308,20 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     gameplay = engine / "src/GameStatePlay.cpp"
     gameplay_source = gameplay.read_text(encoding="utf-8")
     native_header = '#ifdef __ANDROID__\n#include <jni.h>\n#include "SDL_system.h"\n#endif\n'
+    # Revert the exact generated gameplay clock hook between build variants.
+    start_marker = "\t// FlareVKAds session start begin\n"
+    stop_marker = "\t// FlareVKAds session start end\n"
+    if start_marker in gameplay_source:
+        if gameplay_source.count(start_marker) != 1 or gameplay_source.count(stop_marker) != 1:
+            raise ValueError("Malformed VK session start hook")
+        start = gameplay_source.index(start_marker)
+        stop = gameplay_source.index(stop_marker, start) + len(stop_marker)
+        if 'GetMethodID(vk_class, "onGameSessionStarted", "()V")' not in gameplay_source[start:stop]:
+            raise ValueError("Unexpected VK session start hook")
+        gameplay_source = gameplay_source[:start] + gameplay_source[stop:]
+    elif stop_marker in gameplay_source:
+        raise ValueError("Incomplete VK session start hook")
+
     ad_begin = '\t\tsetRequestedGameState(new GameStateTitle());\n#ifdef __ANDROID__\n'
     ad_end = '\n#endif\n\n\t\tsave_load->setGameSlot(0);'
     if gameplay_source.count(ad_begin) > 1:
@@ -326,6 +346,27 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         raise ValueError("Orphaned VK Ads JNI include without a known callback")
 
     if vk_interstitial_slot:
+        start_anchor = "\tsecond_timer.setDuration(settings->max_frames_per_sec);"
+        if gameplay_source.count(start_anchor) != 1:
+            raise ValueError("Cannot find Flare gameplay session start")
+        native_start = (
+            "\t// FlareVKAds session start begin\n"
+            "#ifdef __ANDROID__\n"
+            "\tJNIEnv* vk_env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());\n"
+            "\tif (vk_env) {\n"
+            "\t\tjobject vk_activity = static_cast<jobject>(SDL_AndroidGetActivity());\n"
+            "\t\tif (vk_activity) {\n"
+            "\t\t\tjclass vk_class = vk_env->GetObjectClass(vk_activity);\n"
+            "\t\t\tjmethodID vk_method = vk_env->GetMethodID(vk_class, \"onGameSessionStarted\", \"()V\");\n"
+            "\t\t\tif (vk_method) vk_env->CallVoidMethod(vk_activity, vk_method);\n"
+            "\t\t\tvk_env->DeleteLocalRef(vk_class);\n"
+            "\t\t\tvk_env->DeleteLocalRef(vk_activity);\n"
+            "\t\t}\n"
+            "\t}\n"
+            "#endif\n"
+            "\t// FlareVKAds session start end\n"
+        )
+        gameplay_source = gameplay_source.replace(start_anchor, native_start + start_anchor)
         exit_anchor = (
             "\t\tsnd->stopMusic();\n"
             "\t\tshowLoading();\n"

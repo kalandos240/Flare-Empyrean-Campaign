@@ -24,7 +24,8 @@ final class VkAdsBridge {
 
     private final FLARE activity;
     private final int slotId;
-    private final long sessionStartedAt = SystemClock.elapsedRealtime();
+    // The title screen and first-launch installation do not count as playtime.
+    private long sessionStartedAt = 0L;
     private long lastShownAt = 0;
     private boolean privacyReady = false;
     private boolean loaded = false;
@@ -50,12 +51,19 @@ final class VkAdsBridge {
         }
     }
 
+    void onGameSessionStarted() {
+        sessionStartedAt = SystemClock.elapsedRealtime();
+    }
+
     void onGameSessionEnded() {
-        if (!privacyReady || slotId <= 0 || !loaded || pendingAd == null)
+        // Consume each completed session exactly once, even without an ad.
+        long start = sessionStartedAt;
+        sessionStartedAt = 0L;
+        if (start == 0L || !privacyReady || slotId <= 0 || !loaded || pendingAd == null)
             return;
 
         long now = SystemClock.elapsedRealtime();
-        if (now - sessionStartedAt < MIN_SESSION_AGE_MS ||
+        if (now - start < MIN_SESSION_AGE_MS ||
                 (lastShownAt > 0 && now - lastShownAt < MIN_BETWEEN_ADS_MS))
             return;
 
