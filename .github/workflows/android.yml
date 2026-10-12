@@ -12,6 +12,7 @@ on:
       - 'tests/test_prepare_android.py'
       - 'android/LaunchActivity.java'
       - 'android/CampaignPathValidator.java'
+      - 'android/native/**'
       - 'tests/java/**'
       - 'README.md'
 

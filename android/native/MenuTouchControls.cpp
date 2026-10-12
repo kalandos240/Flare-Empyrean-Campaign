@@ -47,8 +47,8 @@ MenuTouchControls::MenuTouchControls()
 	, prev_touch_scale(settings->touch_scale)
 {
 	visible = true;
-	attack_label->setText("Атака");
-	interact_label->setText("Действие");
+	attack_label->setText("Атаковать");
+	interact_label->setText("Использовать");
 	move_label->setText("Движение");
 	attack_label->setJustify(FontEngine::JUSTIFY_CENTER);
 	interact_label->setJustify(FontEngine::JUSTIFY_CENTER);
