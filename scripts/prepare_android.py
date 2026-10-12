@@ -411,8 +411,8 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             + '    /** Called by the native engine on entering gameplay. */\n'
             + '    public void onGameSessionStarted() {\n'
             + '        runOnUiThread(() -> {\n'
-            + ("            currentNetworkVk = getSharedPreferences(\\"flare_ads\\", MODE_PRIVATE).getBoolean(\\"next_vk\\", true);\n"
-               "            getSharedPreferences(\\"flare_ads\\", MODE_PRIVATE).edit().putBoolean(\\"next_vk\\", !currentNetworkVk).apply();\n"
+            + ("            currentNetworkVk = getSharedPreferences(\"flare_ads\", MODE_PRIVATE).getBoolean(\"next_vk\", true);\n"
+               "            getSharedPreferences(\"flare_ads\", MODE_PRIVATE).edit().putBoolean(\"next_vk\", !currentNetworkVk).apply();\n"
                if vk_interstitial_slot and yandex_interstitial_unit
                else ("            currentNetworkVk = true;\n" if vk_interstitial_slot else "            currentNetworkVk = false;\n"))
             + ('            if (currentNetworkVk && vkAds != null) vkAds.onGameSessionStarted();\n' if vk_interstitial_slot else "")
