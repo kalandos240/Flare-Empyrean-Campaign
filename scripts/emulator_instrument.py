@@ -273,6 +273,7 @@ def instrument(source_dir: Path) -> None:
         src / "GameStateCutscene.cpp",
         '\telse if (button_advance->checkClick()) {\n\t\tskip = SKIP_NEXT;',
         '\telse if (button_advance->checkClick()) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: intro next arrow accepted");\n'
         '\t\tUtils::logInfo("FlarePort QA: scene advance %u/%u last=%d", '
         'static_cast<unsigned>(sub_index), static_cast<unsigned>(subscenes.size()), is_last_scene ? 1 : 0);\n'
         '\t\tskip = SKIP_NEXT;',
@@ -292,16 +293,6 @@ def instrument(source_dir: Path) -> None:
         '\t\telse if (status == Scene::NEXT) {\n'
         '\t\t\tUtils::logInfo("FlarePort QA: cutscene scene index advanced");\n'
         '\t\t\tscene_index++;',
-    )
-
-    # Distinguish slow/backlogged cutscenes from ignored screen taps.
-    # Log only genuine clicks handled by the original Next button.
-    inject(
-        src / "GameStateCutscene.cpp",
-        '\telse if (button_advance->checkClick()) {\n\t\tskip = SKIP_NEXT;',
-        '\telse if (button_advance->checkClick()) {\n'
-        '\t\tUtils::logInfo("FlarePort QA: intro next arrow accepted");\n'
-        '\t\tskip = SKIP_NEXT;',
     )
 
     # The intro cutscene must *finish* before we claim playable gameplay.
