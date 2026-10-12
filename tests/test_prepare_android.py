@@ -274,7 +274,8 @@ class PrepareAndroidTests(unittest.TestCase):
             prepare(engine, game, vk_interstitial_slot=314159,
                     yandex_interstitial_unit="R-M-CI-PLACEHOLDER")
             combined_activity = (app / "src/main/java/org/flare/app/FLARE.java").read_text()
-            self.assertIn("nextNetworkVk = !nextNetworkVk", combined_activity)
+            self.assertIn('getSharedPreferences("flare_ads", MODE_PRIVATE)', combined_activity)
+            self.assertIn('putBoolean("next_vk", !currentNetworkVk)', combined_activity)
             self.assertIn("if (currentNetworkVk && vkAds != null)", combined_activity)
             self.assertIn("if (!currentNetworkVk && yandexAds != null)", combined_activity)
             self.assertIn("vkAds.setPrivacyReady(true)", combined_activity)
