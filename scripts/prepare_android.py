@@ -13,6 +13,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 PACKAGE_ID = "com.kalandos240.flareempyrean"
 CONTENT_VERSION = "empyrean-2026-10-11-v2"
+VK_ADS_SDK_VERSION = "5.52.5"
 
 APP_GRADLE = """plugins {
     id 'com.android.application'
@@ -192,11 +193,13 @@ def pack_campaign(engine: Path, game: Path, destination: Path) -> None:
 
     (destination.parent / "campaign-info.properties").write_text(manifest, encoding="ascii")
 
-def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a") -> Path:
+def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_interstitial_slot: int = 0) -> Path:
     supported = {"armeabi-v7a", "arm64-v8a", "x86_64", "x86"}
     requested = abis.split()
     if not requested or any(abi not in supported for abi in requested) or len(set(requested)) != len(requested):
         raise ValueError(f"Unsupported or repeated Android ABI: {abis!r}")
+    if type(vk_interstitial_slot) is not int or vk_interstitial_slot < 0 or vk_interstitial_slot > 2147483647:
+        raise ValueError("VK interstitial slot must be an integer from 0 to 2147483647")
     engine = engine.resolve()
     game = game.resolve()
     project = engine / "flare-android-project"
@@ -207,9 +210,51 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a") -> Pa
     java = app / "src/main/java/org/flare/app"
     java.mkdir(parents=True, exist_ok=True)
 
-    (app / "build.gradle").write_text(APP_GRADLE, encoding="utf-8")
-    (app / "src/main/AndroidManifest.xml").write_text(MANIFEST, encoding="utf-8")
-    (java / "FLARE.java").write_text(FLARE_ACTIVITY, encoding="utf-8")
+    gradle_source = APP_GRADLE
+    manifest_source = MANIFEST
+    activity_source = FLARE_ACTIVITY
+    if vk_interstitial_slot:
+        # Explicit opt-in only. Default RuStore builds remain free of ad SDK,
+        # advertising network permissions, IDs and background initialization.
+        gradle_source += (
+            "\n// VK Реклама / myTarget: opt-in Android interstitial integration.\n"
+            "dependencies {\n"
+            f"    implementation 'com.my.target:mytarget-sdk:{VK_ADS_SDK_VERSION}'\n"
+            "}\n"
+        )
+        manifest_source = manifest_source.replace(
+            "    <application",
+            '    <uses-permission android:name="android.permission.INTERNET" />\n\n    <application',
+            1,
+        )
+        activity_source = activity_source.replace(
+            "import org.libsdl.app.SDLActivity;",
+            "import android.os.Bundle;\nimport org.libsdl.app.SDLActivity;",
+        )
+        activity_source = activity_source.replace(
+            "public class FLARE extends SDLActivity {",
+            "public class FLARE extends SDLActivity {\n"
+            "    private VkAdsBridge vkAds;\n"
+            "    @Override protected void onCreate(Bundle state) {\n"
+            "        super.onCreate(state);\n"
+            f"        vkAds = new VkAdsBridge(this, {vk_interstitial_slot});\n"
+            "    }\n"
+            "    /** Called only after the native engine saved an ended game session. */\n"
+            "    public void onGameSessionEnded() {\n"
+            "        runOnUiThread(() -> {\n"
+            "            if (vkAds != null) vkAds.onGameSessionEnded();\n"
+            "        });\n"
+            "    }\n",
+            1,
+        )
+        # Privacy consent is intentionally not granted automatically:
+        # the future consent UI must explicitly call vkAds.setPrivacyReady().
+        ad_bridge = Path(__file__).resolve().parents[1] / "android/VkAdsBridge.java"
+        (java / "VkAdsBridge.java").write_text(ad_bridge.read_text(encoding="utf-8"), encoding="utf-8")
+
+    (app / "build.gradle").write_text(gradle_source, encoding="utf-8")
+    (app / "src/main/AndroidManifest.xml").write_text(manifest_source, encoding="utf-8")
+    (java / "FLARE.java").write_text(activity_source, encoding="utf-8")
     (java / "LaunchActivity.java").write_text(
         (Path(__file__).resolve().parents[1] / "android/LaunchActivity.java").read_text(encoding="utf-8"),
         encoding="utf-8",
@@ -229,6 +274,44 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a") -> Pa
         ),
         encoding="utf-8",
     )
+
+    if vk_interstitial_slot:
+        gameplay = engine / "src/GameStatePlay.cpp"
+        gameplay_source = gameplay.read_text(encoding="utf-8")
+        exit_anchor = (
+            "\t\tsnd->stopMusic();\n"
+            "\t\tshowLoading();\n"
+            "\t\tsetRequestedGameState(new GameStateTitle());\n"
+            "\n\t\tsave_load->setGameSlot(0);"
+        )
+        if gameplay_source.count(exit_anchor) != 1:
+            raise ValueError("Cannot identify official saved-game exit-to-title transition")
+        android_ad_call = (
+            "\t\tsnd->stopMusic();\n"
+            "\t\tshowLoading();\n"
+            "\t\tsetRequestedGameState(new GameStateTitle());\n"
+            "#ifdef __ANDROID__\n"
+            "\t\t// Do not show an ad until AFTER the native session was saved.\n"
+            "\t\tJNIEnv* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());\n"
+            "\t\tif (env) {\n"
+            "\t\t\tjobject activity = SDL_AndroidGetActivity();\n"
+            "\t\t\tif (activity) {\n"
+            "\t\t\t\tjclass clazz = env->GetObjectClass(activity);\n"
+            "\t\t\t\tjmethodID method = env->GetMethodID(clazz, \"onGameSessionEnded\", \"()V\");\n"
+            "\t\t\t\tif (method) env->CallVoidMethod(activity, method);\n"
+            "\t\t\t\tenv->DeleteLocalRef(clazz);\n"
+            "\t\t\t\tenv->DeleteLocalRef(activity);\n"
+            "\t\t\t}\n"
+            "\t\t}\n"
+            "#endif\n"
+            "\n\t\tsave_load->setGameSlot(0);"
+        )
+        gameplay_source = gameplay_source.replace(exit_anchor, android_ad_call)
+        gameplay_source = (
+            '#ifdef __ANDROID__\n#include <jni.h>\n#include "SDL_system.h"\n#endif\n'
+            + gameplay_source
+        )
+        gameplay.write_text(gameplay_source, encoding="utf-8")
 
     patch_sdl_makefiles(app / "src/main/jni")
 
@@ -251,8 +334,10 @@ def main() -> None:
     parser.add_argument("--game", type=Path, required=True)
     parser.add_argument("--abis", default="armeabi-v7a arm64-v8a",
                         help="Whitespace-separated Android native ABIs. Use x86_64 for emulator tests.")
+    parser.add_argument("--vk-interstitial-slot", type=int, default=0,
+                        help="Opt-in VK Ads slot ID (0 = no SDK, no ads; privacy UI not implemented yet).")
     args = parser.parse_args()
-    project = prepare(args.engine, args.game, args.abis)
+    project = prepare(args.engine, args.game, args.abis, args.vk_interstitial_slot)
     print(f"Prepared Flare Android project: {project}")
 
 if __name__ == "__main__":
