@@ -248,6 +248,19 @@ class PrepareAndroidTests(unittest.TestCase):
         self.assertIn("qa_pause_was_visible", instrument)
         self.assertIn("src / \"MenuManager.cpp\"", instrument)
 
+    def test_death_end_to_end_uses_test_only_request(self):
+        root = Path(__file__).resolve().parents[1]
+        receiver = (root / "android/QaReceiver.java").read_text()
+        engine = (root / "scripts/emulator_instrument.py").read_text()
+        script = (root / "scripts/emulator_death_test.sh").read_text()
+        workflow = (root / ".github/workflows/android-smoke.yml").read_text()
+        self.assertIn('trigger-death', receiver)
+        self.assertIn('pc->stats.hp = 0', engine)
+        self.assertIn('original Game Over dialog displayed', engine)
+        self.assertIn('original Game Over dialog displayed', script)
+        self.assertIn('bash scripts/emulator_death_test.sh', (root / "scripts/emulator_smoke.sh").read_text())
+        self.assertIn('flare-death-screen.png', workflow)
+
     def test_manifest_launch_is_exported_and_sdl_is_private(self):
         self.assertIn('android:name="org.flare.app.LaunchActivity"', MANIFEST)
         self.assertIn('android:exported="true"', MANIFEST)

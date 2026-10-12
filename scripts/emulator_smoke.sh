@@ -304,5 +304,6 @@ bash scripts/emulator_load_test.sh
 bash scripts/emulator_movement_test.sh
 bash scripts/emulator_hud_test.sh
 bash scripts/emulator_back_test.sh
+bash scripts/emulator_death_test.sh
 
-echo 'Touch inventory, basic action queueing and Android Back pause/resume have emulator checks; enemy combat and physical-device input still need QA.'
+echo 'Touch controls, pause, save/load and original Game Over screen have emulator checks; real enemy hits and physical-device input still need QA.'

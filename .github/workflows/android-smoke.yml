@@ -14,6 +14,7 @@ on:
       - 'scripts/emulator_movement_test.sh'
       - 'scripts/emulator_hud_test.sh'
       - 'scripts/emulator_back_test.sh'
+      - 'scripts/emulator_death_test.sh'
       - 'scripts/emulator_instrument.py'
       - 'scripts/assert_screen_change.py'
       - 'android/**'
@@ -138,6 +139,8 @@ jobs:
             ${{ runner.temp }}/flare-back-pause.png
             ${{ runner.temp }}/flare-back-resume.png
             ${{ runner.temp }}/flare-back-test.log
+            ${{ runner.temp }}/flare-death-screen.png
+            ${{ runner.temp }}/flare-death-test.log
             ${{ runner.temp }}/flare-android-smoke.log
           if-no-files-found: warn
           retention-days: 7

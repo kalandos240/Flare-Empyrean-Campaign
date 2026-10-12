@@ -85,6 +85,11 @@ public final class QaReceiver extends BroadcastReceiver {
                     }
                 }
                 Log.i(TAG, "QA avatar PASS; real engine character saved and persisted");
+            } else if ("trigger-death".equals(op)) {
+                // Emulator-only: leave the real saved hero intact.
+                File trigger = new File(saves, ".flare-ci-trigger-death");
+                write(trigger, "death-test", false);
+                Log.i(TAG, "QA trigger-death PASS; native death requested");
             } else if ("verify".equals(op)) {
                 File testFile = new File(saves, ".flare-ci-persistence-test");
                 if (!testFile.isFile()

@@ -83,6 +83,38 @@ def instrument(source_dir: Path) -> None:
         '\t\t\tUtils::logInfo("FlarePort QA: dedicated interact button pressed ACCEPT");\n',
     )
 
+    # Emulator-only death trigger goes through the real Avatar state machine.
+    inject(
+        src / "GameStatePlay.cpp",
+        "#include <cassert>\n",
+        "#include <cassert>\n#include <cstdio>\n#include <fstream>\n",
+    )
+    inject(
+        src / "GameStatePlay.cpp",
+        '\t\tpc->logic();\n',
+        '\t\t{\n'
+        '\t\t\tconst std::string death_marker = settings->path_user + "saves/.flare-ci-trigger-death";\n'
+        '\t\t\tstd::ifstream death_signal(death_marker.c_str());\n'
+        '\t\t\tif (death_signal.good() && pc->stats.alive) {\n'
+        '\t\t\t\tdeath_signal.close();\n'
+        '\t\t\t\tstd::remove(death_marker.c_str());\n'
+        '\t\t\t\tpc->stats.hp = 0;\n'
+        '\t\t\t\tUtils::logInfo("FlarePort QA: lethal damage triggered in actual Avatar");\n'
+        '\t\t\t}\n'
+        '\t\t}\n'
+        '\t\tpc->logic();\n',
+    )
+    inject(
+        src / "MenuManager.cpp",
+        '\tgame_over->logic();\n',
+        '\tgame_over->logic();\n'
+        '\tstatic bool qa_gameover_logged = false;\n'
+        '\tif (game_over->visible && !qa_gameover_logged) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: original Game Over dialog displayed");\n'
+        '\t\tqa_gameover_logged = true;\n'
+        '\t}\n',
+    )
+
     # Test-only observability: a directional joystick event must also move
     # the real hero in the native game world (not just change pixels).
     inject(

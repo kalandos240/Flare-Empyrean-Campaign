@@ -161,3 +161,10 @@ steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpt
 - The right-side rings are now labeled **«Использовать»** and **«Атаковать»**. «Атаковать» executes the equipped MAIN2 action (slot 11), not two duplicate attack circles. «Использовать» dispatches a one-shot **ACCEPT** event to the original engine, which handles nearby NPC conversations and loot pickup. The original campaign logic, inventory and quests are unchanged.
 - Finger IDs are tracked separately. Moving with the left thumb and holding the right-side attack button should work simultaneously; the movement thumb cannot accidentally press the right-side controls. The old touch MAIN1 attack zone is disabled only in this Android build.
 - Emulator-only QA instruments native joystick motion, attack slot 11 and the interaction-button ACCEPT dispatch. This does **not** guarantee a specific NPC or dropped item is present at the test location, so actual talk/pickup still needs interactive gameplay QA.
+
+## Emulator defeat and original Game Over (test not yet certified)
+
+- The API 30 emulator checks title, character creation, touchscreen, native save/relaunch/load and Android Back before the final death scenario.
+- Emulator-only `QaReceiver` requests a one-shot defeat via an app-owned marker. Emulator-only engine C++ sets native hero HP to zero; the actual Avatar death animation and original Game Over menu then execute without production patches.
+- A successful test requires an original Game Over visibility marker, live native process and screenshot `flare-death-screen.png`. This is **not** a substitute for enemy-hit, balance or all-quest gameplay QA.
+- All diagnostic code and the marker receiver are excluded from production ARM builds. The saved character file is not modified by the death trigger.
