@@ -125,29 +125,29 @@ jobs:
           grep -q '^assets/campaign-info.properties$' "$RUNNER_TEMP/flare-apk-entries.txt"
           grep -q '^base/assets/campaign.zip$' "$RUNNER_TEMP/flare-aab-entries.txt"
 
-      - name: Publish direct-install Android 0.2.1 APK
+      - name: Publish direct-install Android 0.2.2 APK
         if: github.ref == 'refs/heads/port/rustore-android-foundation'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="android-v0.2.1-debug"
+          TAG="android-v0.2.2-debug"
           APK="upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk"
-          cp "$APK" "$RUNNER_TEMP/flare-empyrean-0.2.1-debug.apk"
-          sha256sum "$RUNNER_TEMP/flare-empyrean-0.2.1-debug.apk" > "$RUNNER_TEMP/flare-empyrean-0.2.1-debug.apk.sha256"
+          cp "$APK" "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk"
+          sha256sum "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk" > "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk.sha256"
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title "Flare: Empyrean Campaign 0.2.1 — Android APK" \
-              --notes "Android 8.0+ ARM debug APK. Touch fix: quickbar potion slots work while the floating joystick is in use; Attack is slot 10 (MAIN1), Skill is slot 11 (MAIN2); buttons brought slightly closer. Developer/debug signature only, not a signed RuStore package. This is an ad-free build."
+              --title "Flare: Empyrean Campaign 0.2.2 — Android APK" \
+              --notes "Android 8.0+ ARM debug APK. Touch fixes: separate joystick/quickslot fingers, correctly assigned Attack (MAIN1) and Skill (MAIN2), a tighter three-button group positioned above the potion bar; touch controls pause while game menus are open. Developer/debug signature only, not a signed RuStore package. This is an ad-free build."
           fi
           for attempt in 1 2 3; do
             if gh release upload "$TAG" \
-              "$RUNNER_TEMP/flare-empyrean-0.2.1-debug.apk" \
-              "$RUNNER_TEMP/flare-empyrean-0.2.1-debug.apk.sha256" \
+              "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk" \
+              "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk.sha256" \
               --repo "$GITHUB_REPOSITORY" --clobber; then
-              echo "Direct APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/flare-empyrean-0.2.1-debug.apk"
+              echo "Direct APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/flare-empyrean-0.2.2-debug.apk"
               exit 0
             fi
             sleep 10

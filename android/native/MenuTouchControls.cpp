@@ -86,12 +86,12 @@ void MenuTouchControls::align() {
 	move_deadzone = static_cast<int>(settings->view_h / 20 * settings->touch_scale);
 
 	main1_radius = static_cast<int>(settings->view_h / 6 * settings->touch_scale);
-	main1_center_base.x = -main1_radius - static_cast<int>((settings->view_h * 9 / 40) * settings->touch_scale);
-	main1_center_base.y = static_cast<int>((settings->view_h / 8) * settings->touch_scale * -1);
+	main1_center_base.x = -main1_radius - static_cast<int>((settings->view_h * 7 / 40) * settings->touch_scale);
+	main1_center_base.y = -static_cast<int>((settings->view_h * 5 / 16) * settings->touch_scale);
 
 	main2_radius = static_cast<int>(settings->view_h / 6 * settings->touch_scale);
-	main2_center_base.x = -static_cast<int>((settings->view_h / 40) * settings->touch_scale);
-	main2_center_base.y = static_cast<int>((settings->view_h / 6) * settings->touch_scale * -1);
+	main2_center_base.x = -static_cast<int>((settings->view_h * 3 / 40) * settings->touch_scale);
+	main2_center_base.y = -static_cast<int>((settings->view_h * 5 / 16) * settings->touch_scale);
 
 	radius_padding = static_cast<int>(settings->view_h / 20 * settings->touch_scale);
 	skill_radius = static_cast<int>(settings->view_h / 8 * settings->touch_scale);
@@ -99,17 +99,22 @@ void MenuTouchControls::align() {
 	alignInput(move_center, move_center_base, move_radius, move_align);
 	alignInput(main1_center, main1_center_base, main1_radius, main1_align);
 	alignInput(main2_center, main2_center_base, main2_radius, main2_align);
-	// Above the Use ring, clear of the action bar and the Attack ring.
-	skill_center.x = main1_center.x;
+	// Place the skill above and between Attack and Use; keep every ring clear
+	// of the bottom potion/action bar and the Android screen edge.
+	skill_center.x = (main1_center.x + main2_center.x) / 2;
 	skill_center.y = std::max(skill_radius, main1_center.y - main1_radius - skill_radius - radius_padding / 3);
 }
 
 void MenuTouchControls::logic() {
 	// The default engine has only one synthetic mouse position, which breaks
 	// simultaneous thumb movement and attack. Track real SDL finger IDs.
-	if (!visible || !settings->touchscreen || settings->mouse_move) {
+	if (!visible || !settings->touchscreen || settings->mouse_move || (menu && (menu->menus_open || menu->pause))) {
+		// Do not drive the hero while the inventory, dialog or pause menu has focus.
+		// Leave MAIN1 alone: normal SDL taps must still reach menu widgets.
 		move_finger_id = attack_finger_id = interact_finger_id = skill_finger_id = hotbar_finger_id = -1;
 		move_active = false;
+		inpt->pressing[Input::LEFT] = inpt->pressing[Input::RIGHT] =
+			inpt->pressing[Input::UP] = inpt->pressing[Input::DOWN] = false;
 		if (interact_pulse) {
 			inpt->pressing[Input::ACCEPT] = false;
 			interact_pulse = false;
@@ -173,7 +178,7 @@ void MenuTouchControls::logic() {
 		FPoint skill(static_cast<float>(skill_center.x), static_cast<float>(skill_center.y));
 		// One tap uses the original assigned quickbar power, including potions,
 		// even when a different SDL finger keeps the virtual stick moving.
-		if (menu && menu->act && !menu->menus_open && menu->act->isWithinSlots(pos)) {
+		if (menu && menu->act && menu->act->isWithinSlots(pos)) {
 			if (hotbar_finger_id == -1) {
 				WidgetSlot* quickslot = menu->act->getSlotFromPosition(pos);
 				if (quickslot) {
@@ -257,7 +262,7 @@ void MenuTouchControls::renderInput(const Point& center, const int radius, const
 }
 
 void MenuTouchControls::render() {
-	if (!visible || !settings->touchscreen || settings->mouse_move)
+	if (!visible || !settings->touchscreen || settings->mouse_move || (menu && (menu->menus_open || menu->pause)))
 		return;
 
 	Color normal(255,255,255,225);
