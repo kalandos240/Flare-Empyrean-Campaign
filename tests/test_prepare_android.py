@@ -45,7 +45,13 @@ class PrepareAndroidTests(unittest.TestCase):
 
             (app / "build.gradle").write_text("old")
             (jni / "Application.mk").write_text("APP_ABI := armeabi-v7a arm64-v8a x86 x86_64\n")
-            (engine / "src/GameStatePlay.cpp").write_text(\n                "\\t\\tsnd->stopMusic();\n"\n                "\\t\\tshowLoading();\n"\n                "\\t\\tsetRequestedGameState(new GameStateTitle());\n"\n                "\n\\t\\tsave_load->setGameSlot(0);\n"\n            )\n            (engine / "src/PlatformAndroid.cpp").write_text(
+            (engine / "src/GameStatePlay.cpp").write_text(
+                "\t\tsnd->stopMusic();\n"
+                "\t\tshowLoading();\n"
+                "\t\tsetRequestedGameState(new GameStateTitle());\n"
+                "\n\t\tsave_load->setGameSlot(0);\n"
+            )
+            (engine / "src/PlatformAndroid.cpp").write_text(
                 "void Platform::setPaths() { old(); }\nvoid other() {}\n"
             )
             (jni / "SDL2_image/Android.mk").write_text(
