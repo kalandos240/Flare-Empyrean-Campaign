@@ -195,7 +195,9 @@ class PrepareAndroidTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         smoke = (root / "scripts/emulator_smoke.sh").read_text()
         workflow = (root / ".github/workflows/android-smoke.yml").read_text()
-        self.assertIn("FLARE_SMOKE_CREATOR_ONLY=1", workflow)
+        # The runner invokes a *single shell command*: matrix API 26 sets
+        # creator-only mode, while API 30 runs the complete campaign test.
+        self.assertIn("FLARE_SMOKE_CREATOR_ONLY=${{ matrix.api_level == 26 && '1' || '0' }}", workflow)
         self.assertIn("api_level: [26, 30]", workflow)
         self.assertIn("FlarePort QA: gameplay state constructed", smoke)
         self.assertIn("FLARE_SMOKE_CREATOR_ONLY", smoke)
