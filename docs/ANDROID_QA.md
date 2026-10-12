@@ -72,6 +72,13 @@ Android version and reproducible issues in a GitHub issue.
 - **Minimum Android 8.0 (API 26)**. The production validator uses `java.nio.file.Files.isSymbolicLink()` to reject existing and dangling symlinks at every archive path component, plus exclusive temporary file creation as defense in depth.
 - This protects against malformed campaign archives but does not replace physical-device install/upgrade QA.
 
+## Android 8.0 minimum-version acceptance
+
+- The **API 26** emulator test builds and installs the real pinned Flare engine and Empyrean Campaign, confirms the SDL activity and live process, checks the native original-title-render marker, and uploads a screenshot. This is a first-launch compatibility check, not a complete campaign test.
+- The separate **API 30** emulator job runs the full first-launch, character creation, cutscene, persistence, saved-character reload, joystick, inventory and action-button regression sequence.
+- Both runs use an x86_64 test-only build with diagnostic hooks; production RuStore ARM APK/AAB are compiled and audited separately.
+- Both matrix jobs must succeed for the overall emulator workflow to pass.
+
 ## First launch and filesystem
 
 - [ ] Start with a clean installation. Confirm that the Russian progress screen

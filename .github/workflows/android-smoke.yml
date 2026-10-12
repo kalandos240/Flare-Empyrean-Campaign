@@ -29,6 +29,10 @@ jobs:
   emulator:
     runs-on: ubuntu-latest
     timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        api_level: [26, 30]
     steps:
       - uses: actions/checkout@v4
 
@@ -92,24 +96,28 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Boot emulator and confirm native campaign loads
+      - name: Boot Android API ${{ matrix.api_level }} emulator and verify native game
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: ${{ matrix.api_level }}
           target: google_apis
           arch: x86_64
           profile: pixel_5
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -partition-size 8192
           disable-animations: true
           script: |
-            bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
-            echo "Emulator interaction and screenshots completed."
+            if [[ "${{ matrix.api_level }}" == "26" ]]; then
+              FLARE_SMOKE_BOOT_ONLY=1 bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
+            else
+              bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
+            fi
+            echo "Android API ${{ matrix.api_level }} native engine test completed."
 
       - name: Upload emulator screenshot and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: flare-emulator-diagnostics
+          name: flare-emulator-diagnostics-api${{ matrix.api_level }}
           path: |
             ${{ runner.temp }}/flare-native-start.png
             ${{ runner.temp }}/flare-title-not-ready.png

@@ -78,6 +78,14 @@ TITLE_SCREEN="$DIAGNOSTICS/flare-native-start.png"
 CHARACTER_SCREEN="$DIAGNOSTICS/flare-character-creation.png"
 adb exec-out screencap -p > "$TITLE_SCREEN"
 
+# Android 8 (API 26) baseline: validate first-run extraction, real SDL
+# activity, live process, original engine title rendering and screenshot.
+# Keep the much longer campaign/save/input scenario on Android 11 (API 30).
+if [[ "${FLARE_SMOKE_BOOT_ONLY:-0}" == 1 ]]; then
+  echo 'PASSED: Android 8 baseline native campaign startup and title rendering.'
+  exit 0
+fi
+
 read -r tap_x tap_y create_x create_y < <(python - "$TITLE_SCREEN" <<'PY'
 import struct
 import sys
