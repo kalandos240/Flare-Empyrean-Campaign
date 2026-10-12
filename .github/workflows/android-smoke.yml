@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/android-smoke.yml'
       - 'scripts/prepare_android.py'
+      - 'tests/test_prepare_android.py'
       - 'scripts/emulator_smoke.sh'
       - 'scripts/emulator_load_test.sh'
       - 'scripts/emulator_movement_test.sh'
