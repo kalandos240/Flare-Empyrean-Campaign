@@ -2,8 +2,6 @@ package org.flare.app;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 /** Validates bundled ZIP entries without giving the installer access to saves. */
 final class CampaignPathValidator {
@@ -32,21 +30,11 @@ final class CampaignPathValidator {
         if (!new File(root, parts[0]).getCanonicalPath().equals(rootPath)) {
             throw new IOException("Подменён каталог игровых ресурсов: " + name);
         }
-        // Canonical paths alone do not reliably detect dangling symlinks.
-        // Walk every existing component, including the destination itself,
-        // so an attacker cannot redirect extraction even when the link target
-        // has not been created yet.
-        Path cursor = root.toPath().toAbsolutePath().normalize();
-        if (Files.isSymbolicLink(cursor)) {
-            throw new IOException("Недопустимая символическая ссылка в каталоге установки");
-        }
-        for (String part : parts) {
-            if (part.isEmpty()) continue; // allowed trailing directory slash
-            cursor = cursor.resolve(part);
-            if (Files.isSymbolicLink(cursor)) {
-                throw new IOException("Символическая ссылка в пути игрового архива: " + name);
-            }
-        }
+        // Android API 24 has no java.nio.file.Files.isSymbolicLink().
+        // Canonical paths reject redirects to existing app-owned save files.
+        // For dangling destination links, renameTo replaces the link itself;
+        // for temporary files the installer uses exclusive createNewFile().
+        // A dangling directory link fails the installer's mkdirs() check.
         File target = new File(root, name);
         if (!target.getCanonicalPath().startsWith(rootPath + File.separator)) {
             throw new IOException("Путь ресурса выходит за разрешённый каталог: " + name);

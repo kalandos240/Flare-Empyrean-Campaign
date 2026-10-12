@@ -70,6 +70,15 @@ public final class CampaignPathValidatorTest {
                 // Also safe: exclusive file creation refused an existing symlink.
             }
             checks++;
+            // A dangling intermediate directory link must not be traversable
+            // by the installer's isDirectory()/mkdirs() preparation.
+            Path missingParent = folder.resolve("mods/default/missing-link");
+            Files.createSymbolicLink(missingParent, folder.resolve("userdata/saves/not-a-directory"));
+            File parent = missingParent.toFile();
+            if (parent.isDirectory() || parent.mkdirs()) {
+                throw new AssertionError("Installer would enter a dangling directory symlink");
+            }
+            checks++;
         } finally {
             try (java.util.stream.Stream<Path> paths = Files.walk(folder)) {
                 paths.sorted(Comparator.reverseOrder()).forEach(path -> {
