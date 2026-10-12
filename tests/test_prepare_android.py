@@ -207,6 +207,20 @@ class PrepareAndroidTests(unittest.TestCase):
             smoke.index('if [[ "${FLARE_SMOKE_CREATOR_ONLY:-0}" == 1 ]]'),
         )
 
+    def test_android_back_pause_regression_is_wired(self):
+        root = Path(__file__).resolve().parents[1]
+        smoke = (root / "scripts/emulator_smoke.sh").read_text()
+        back = (root / "scripts/emulator_back_test.sh").read_text()
+        workflow = (root / ".github/workflows/android-smoke.yml").read_text()
+        instrument = (root / "scripts/emulator_instrument.py").read_text()
+        self.assertIn("bash scripts/emulator_back_test.sh", smoke)
+        self.assertIn("KEYCODE_BACK", back)
+        self.assertIn("original pause menu opened", back)
+        self.assertIn("original pause menu closed", back)
+        self.assertIn("flare-back-test.log", workflow)
+        self.assertIn("qa_pause_was_visible", instrument)
+        self.assertIn("src / \"MenuManager.cpp\"", instrument)
+
     def test_manifest_launch_is_exported_and_sdl_is_private(self):
         self.assertIn('android:name="org.flare.app.LaunchActivity"', MANIFEST)
         self.assertIn('android:exported="true"', MANIFEST)

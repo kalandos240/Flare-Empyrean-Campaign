@@ -118,6 +118,13 @@ Android version and reproducible issues in a GitHub issue.
       user's chosen settings should override first-run defaults.
 - [ ] Test gamepad and Bluetooth controller (optional, if supported by SDL).
 
+## Android Back / pause regression (test added, not yet certified)
+
+- The API 30 emulator's native gameplay test sends Android `KEYCODE_BACK` twice after validating touchscreen inventory and power queueing.
+- Emulator-only engine markers require the original Flare pause menu to open and close. A screenshot comparison checks that the menu rendered, and the game process must remain alive.
+- The test collects `flare-back-pause.png`, `flare-back-resume.png` and `flare-back-test.log` for failure diagnosis.
+- Android system gestures (including predictive Back) and real phones still require independent QA. The diagnostic C++ markers do not ship in production APKs.
+
 ## Save, lifecycle and stability
 
 - [ ] Create a save, obtain loot, exit the game and relaunch: player, inventory,

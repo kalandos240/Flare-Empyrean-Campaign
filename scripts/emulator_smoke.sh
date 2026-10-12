@@ -303,5 +303,6 @@ echo 'Next: load this saved character through Flare original menu.'
 bash scripts/emulator_load_test.sh
 bash scripts/emulator_movement_test.sh
 bash scripts/emulator_hud_test.sh
+bash scripts/emulator_back_test.sh
 
-echo 'Inventory and basic power activation are now under emulator QA; enemy combat and physical-device input still need QA.'
+echo 'Touch inventory, basic action queueing and Android Back pause/resume have emulator checks; enemy combat and physical-device input still need QA.'

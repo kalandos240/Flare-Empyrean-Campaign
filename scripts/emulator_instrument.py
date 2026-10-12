@@ -124,6 +124,19 @@ def instrument(source_dir: Path) -> None:
         '\t\t\t\taction_queue.push_back(action);',
     )
 
+    # Observe the original Android Back / CANCEL -> pause menu transition.
+    # Only injected into disposable emulator native sources.
+    inject(
+        src / "MenuManager.cpp",
+        '\tpause = (eset->misc.menus_pause && menus_open) || exit->visible || console_open || book->visible;',
+        '\tpause = (eset->misc.menus_pause && menus_open) || exit->visible || console_open || book->visible;\n'
+        '\tstatic bool qa_pause_was_visible = false;\n'
+        '\tif (qa_pause_was_visible != exit->visible) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: original pause menu %s", exit->visible ? "opened" : "closed");\n'
+        '\t\tqa_pause_was_visible = exit->visible;\n'
+        '\t}\n',
+    )
+
     # Only the emulator test build gets an exported receiver for its own files.
     # Scoped Android/data cannot be inspected by adb shell on Android 11+.
     project = source_dir / "flare-android-project/app/src/main"
