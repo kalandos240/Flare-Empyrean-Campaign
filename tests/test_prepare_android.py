@@ -243,6 +243,66 @@ class PrepareAndroidTests(unittest.TestCase):
             )
 
 
+            # Yandex-only configuration, including safe replacement of VK.
+            with self.assertRaises(ValueError):
+                prepare(engine, game, yandex_interstitial_unit="demo-interstitial-yandex")
+            with self.assertRaises(ValueError):
+                prepare(engine, game, yandex_interstitial_unit='R-M-123"; System.exit(0)')
+            prepare(engine, game, yandex_interstitial_unit="R-M-CI-PLACEHOLDER")
+            yandex = app / "src/main/java/org/flare/app/YandexAdsBridge.java"
+            self.assertTrue(yandex.exists())
+            self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
+            self.assertIn("com.yandex.android:mobileads:8.5.0", (app / "build.gradle").read_text())
+            self.assertNotIn("mytarget-sdk", (app / "build.gradle").read_text())
+            self.assertIn("android.useAndroidX=true", (engine / "flare-android-project/gradle.properties").read_text())
+            yandex_manifest = (app / "src/main/AndroidManifest.xml").read_text()
+            self.assertIn('com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION', yandex_manifest)
+            self.assertIn('android:value="false"', yandex_manifest)
+            self.assertIn("android.permission.INTERNET", yandex_manifest)
+            yandex_activity = (app / "src/main/java/org/flare/app/FLARE.java").read_text()
+            self.assertIn("new YandexAdsBridge(this, \"R-M-CI-PLACEHOLDER\")", yandex_activity)
+            self.assertIn('setTitle("Яндекс Реклама: конфиденциальность")', yandex_activity)
+            self.assertIn("yandexAds.setPrivacyReady(true)", yandex_activity)
+            self.assertIn("yandexAds.setPrivacyReady(false)", yandex_activity)
+            self.assertNotIn("VkAdsBridge", yandex_activity)
+            self.assertIn("setPrivacyReady", yandex.read_text())
+            self.assertIn("YandexAds.setUserConsent(true)", yandex.read_text())
+            self.assertIn("new InterstitialAdLoader(activity)", yandex.read_text())
+            self.assertIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+
+            # Combining both networks never queues TWO fullscreen ads on exit.
+            prepare(engine, game, vk_interstitial_slot=314159,
+                    yandex_interstitial_unit="R-M-CI-PLACEHOLDER")
+            combined_activity = (app / "src/main/java/org/flare/app/FLARE.java").read_text()
+            self.assertIn("nextNetworkVk = !nextNetworkVk", combined_activity)
+            self.assertIn("if (currentNetworkVk && vkAds != null)", combined_activity)
+            self.assertIn("if (!currentNetworkVk && yandexAds != null)", combined_activity)
+            self.assertIn("vkAds.setPrivacyReady(true)", combined_activity)
+            self.assertIn("yandexAds.setPrivacyReady(true)", combined_activity)
+            self.assertIn('setTitle("Реклама VK и Яндекса: конфиденциальность")', combined_activity)
+            combined_gradle = (app / "build.gradle").read_text()
+            self.assertIn("mytarget-sdk:5.52.5", combined_gradle)
+            self.assertIn("mobileads:8.5.0", combined_gradle)
+            native = (engine / "src/GameStatePlay.cpp").read_text()
+            self.assertEqual(native.count('GetMethodID(clazz, "onGameSessionEnded", "()V")'), 1)
+            prepare(engine, game, vk_interstitial_slot=314159,
+                    yandex_interstitial_unit="R-M-CI-PLACEHOLDER")
+            self.assertEqual((engine / "src/GameStatePlay.cpp").read_text().count(
+                'GetMethodID(clazz, "onGameSessionEnded", "()V")'), 1)
+
+            # Clear BOTH network SDKs, manifest metadata, JNI hooks and permissions.
+            prepare(engine, game)
+            self.assertFalse(yandex.exists())
+            self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
+            self.assertNotIn("mobileads", (app / "build.gradle").read_text())
+            self.assertNotIn("mytarget-sdk", (app / "build.gradle").read_text())
+            self.assertNotIn("INTERNET", (app / "src/main/AndroidManifest.xml").read_text())
+            self.assertNotIn("AUTOMATIC_SDK_INITIALIZATION", (app / "src/main/AndroidManifest.xml").read_text())
+            self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertIn("android.useAndroidX=false",
+                          (engine / "flare-android-project/gradle.properties").read_text())
+
+
     def test_android_8_smoke_reaches_native_character_creation(self):
         root = Path(__file__).resolve().parents[1]
         smoke = (root / "scripts/emulator_smoke.sh").read_text()

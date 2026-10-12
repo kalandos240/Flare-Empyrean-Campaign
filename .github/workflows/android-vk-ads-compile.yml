@@ -1,4 +1,4 @@
-name: VK Ads optional Android compile
+name: Optional VK and Yandex Ads compile
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/android-vk-ads-compile.yml'
       - 'android/VkAdsBridge.java'
+      - 'android/YandexAdsBridge.java'
       - 'android/CampaignPathValidator.java'
       - 'android/native/**'
       - 'tests/java/**'
@@ -18,13 +19,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: flare-vk-ads-compile-${{ github.ref }}
+  group: flare-optional-ads-compile-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   optional-sdk:
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        network: [vk, yandex, both]
     steps:
       - uses: actions/checkout@v4
 
@@ -32,7 +37,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Test both ad-free and opt-in configuration generation
+      - name: Test ad-free, VK, Yandex and combined generator variants
         run: python -m unittest discover -s tests -v
 
       - uses: actions/setup-java@v4
@@ -66,26 +71,50 @@ jobs:
           git -C upstream/flare-game fetch --depth 1 origin af6eee6d339ac98011864bfe89da837fe7769c28
           git -C upstream/flare-game checkout --detach FETCH_HEAD
 
-      - name: Generate optional VK Ads build with compile-only placeholder slot
+      - name: Generate opt-in ad SDK source (compile-only dummy IDs)
+        shell: bash
         run: |
+          set -euo pipefail
+          extra=()
+          case "${{ matrix.network }}" in
+            vk)
+              extra=(--vk-interstitial-slot 1)
+              ;;
+            yandex)
+              extra=(--yandex-interstitial-unit R-M-CI-PLACEHOLDER)
+              ;;
+            both)
+              extra=(--vk-interstitial-slot 1 --yandex-interstitial-unit R-M-CI-PLACEHOLDER)
+              ;;
+          esac
           python scripts/prepare_android.py \
             --engine upstream/flare-engine --game upstream/flare-game \
-            --abis x86_64 --vk-interstitial-slot 1
-          grep -q "com.my.target:mytarget-sdk:5.52.5" upstream/flare-engine/flare-android-project/app/build.gradle
+            --abis x86_64 "${extra[@]}"
+          test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/FLARE.java
           grep -q 'onGameSessionEnded' upstream/flare-engine/src/GameStatePlay.cpp
-          test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/VkAdsBridge.java
+          if [[ "${{ matrix.network }}" != vk ]]; then
+            grep -q 'mobileads:8.5.0' upstream/flare-engine/flare-android-project/app/build.gradle
+            grep -q 'AUTOMATIC_SDK_INITIALIZATION' upstream/flare-engine/flare-android-project/app/src/main/AndroidManifest.xml
+            test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/YandexAdsBridge.java
+          fi
+          if [[ "${{ matrix.network }}" != yandex ]]; then
+            grep -q 'mytarget-sdk:5.52.5' upstream/flare-engine/flare-android-project/app/build.gradle
+            test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/VkAdsBridge.java
+          fi
 
-      - name: Compile actual VK Ads Java bridge and native engine
+      - name: Compile Android native engine and opted-in ad SDK bridges
         working-directory: upstream/flare-engine/flare-android-project
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.daemon=false'
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon :app:assembleDebug
+          ./gradlew --no-daemon :app:assembleDebug --stacktrace
 
-      - name: Verify opt-in library included
+      - name: Confirm permission and release safety
         run: |
           set -euo pipefail
           APK=upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$APK" | grep -q 'android.permission.INTERNET'
-          echo 'Optional VK SDK compiled successfully. Test slot 1 is invalid and this APK must NOT be published.'
-          # Intentionally never upload the placeholder-slot APK.
+          echo 'Only compilation is verified: dummy IDs are not real ad units. Do NOT publish this APK.'
+          # The deliberately invalid-slot test APK is never uploaded.
