@@ -45,7 +45,7 @@ class PrepareAndroidTests(unittest.TestCase):
 
             (app / "build.gradle").write_text("old")
             (jni / "Application.mk").write_text("APP_ABI := armeabi-v7a arm64-v8a x86 x86_64\n")
-            (engine / "src/PlatformAndroid.cpp").write_text(
+            (engine / "src/GameStatePlay.cpp").write_text(\n                "\\t\\tsnd->stopMusic();\n"\n                "\\t\\tshowLoading();\n"\n                "\\t\\tsetRequestedGameState(new GameStateTitle());\n"\n                "\n\\t\\tsave_load->setGameSlot(0);\n"\n            )\n            (engine / "src/PlatformAndroid.cpp").write_text(
                 "void Platform::setPaths() { old(); }\nvoid other() {}\n"
             )
             (jni / "SDL2_image/Android.mk").write_text(
@@ -89,6 +89,14 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("SUPPORT_MOD_MIKMOD := false", (jni / "SDL2_mixer/Android.mk").read_text())
             self.assertIn("SUPPORT_MP3_SMPEG := false", (jni / "SDL2_mixer/Android.mk").read_text())
 
+            # Production build: no advertising SDK, network permission or JNI hook.
+            default_gradle = (app / "build.gradle").read_text()
+            default_manifest = (app / "src/main/AndroidManifest.xml").read_text()
+            self.assertNotIn("com.my.target:mytarget-sdk", default_gradle)
+            self.assertNotIn("android.permission.INTERNET", default_manifest)
+            self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
+            self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+
             with ZipFile(app / "src/main/assets/campaign.zip") as archive:
                 paths = set(archive.namelist())
                 total_bytes = sum(entry.file_size for entry in archive.infolist())
@@ -109,6 +117,20 @@ class PrepareAndroidTests(unittest.TestCase):
                     archive.read("mods/mods.txt").decode(),
                     "fantasycore\nempyrean_campaign\n",
                 )
+
+            with self.assertRaises(ValueError):
+                prepare(engine, game, vk_interstitial_slot=-1)
+            # Opt-in source generation and dependency wiring, no live ad requests.
+            prepare(engine, game, abis="x86_64", vk_interstitial_slot=314159)
+            self.assertIn("com.my.target:mytarget-sdk:5.52.5", (app / "build.gradle").read_text())
+            self.assertIn("android.permission.INTERNET", (app / "src/main/AndroidManifest.xml").read_text())
+            self.assertIn("new VkAdsBridge(this, 314159)", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
+            self.assertTrue((app / "src/main/java/org/flare/app/VkAdsBridge.java").is_file())
+            cpp = (engine / "src/GameStatePlay.cpp").read_text()
+            self.assertIn('GetMethodID(clazz, "onGameSessionEnded", "()V")', cpp)
+            self.assertIn("save_load->setGameSlot(0);", cpp)
+            self.assertIn("setPrivacyReady", (app / "src/main/java/org/flare/app/VkAdsBridge.java").read_text())
+
 
     def test_manifest_launch_is_exported_and_sdl_is_private(self):
         self.assertIn('android:name="org.flare.app.LaunchActivity"', MANIFEST)
