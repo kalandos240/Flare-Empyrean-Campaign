@@ -14,6 +14,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 PACKAGE_ID = "com.kalandos240.flareempyrean"
 CONTENT_VERSION = "empyrean-2026-10-11-v2"
 VK_ADS_SDK_VERSION = "5.52.5"
+YANDEX_ADS_SDK_VERSION = "8.5.0"
 
 APP_GRADLE = """plugins {
     id 'com.android.application'
@@ -284,13 +285,20 @@ def pack_campaign(engine: Path, game: Path, destination: Path) -> None:
 
     (destination.parent / "campaign-info.properties").write_text(manifest, encoding="ascii")
 
-def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_interstitial_slot: int = 0) -> Path:
+def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_interstitial_slot: int = 0,
+            yandex_interstitial_unit: str = "") -> Path:
     supported = {"armeabi-v7a", "arm64-v8a", "x86_64", "x86"}
     requested = abis.split()
     if not requested or any(abi not in supported for abi in requested) or len(set(requested)) != len(requested):
         raise ValueError(f"Unsupported or repeated Android ABI: {abis!r}")
     if type(vk_interstitial_slot) is not int or vk_interstitial_slot < 0 or vk_interstitial_slot > 2147483647:
         raise ValueError("VK interstitial slot must be an integer from 0 to 2147483647")
+    if not isinstance(yandex_interstitial_unit, str) or (
+            yandex_interstitial_unit and
+            (not re.fullmatch(r"[A-Za-z0-9_-]{3,128}", yandex_interstitial_unit)
+             or yandex_interstitial_unit == "demo-interstitial-yandex")):
+        raise ValueError("Yandex interstitial unit must be a real ad unit ID (not a demo ID)")
+    ads_enabled = bool(vk_interstitial_slot or yandex_interstitial_unit)
     engine = engine.resolve()
     game = game.resolve()
     project = engine / "flare-android-project"
@@ -311,13 +319,19 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         raise ValueError("Expected exactly one upstream AndroidX configuration")
     options = re.sub(
         option_pattern,
-        f"android.useAndroidX={'true' if vk_interstitial_slot else 'false'}",
+        f"android.useAndroidX={'true' if ads_enabled else 'false'}",
         options,
     )
     gradle_properties.write_text(options, encoding="utf-8")
 
     ads_source = (Path(__file__).resolve().parents[1] / "android/VkAdsBridge.java").read_text(encoding="utf-8")
     ads_java = java / "VkAdsBridge.java"
+    yandex_source = (Path(__file__).resolve().parents[1] / "android/YandexAdsBridge.java").read_text(encoding="utf-8")
+    yandex_java = java / "YandexAdsBridge.java"
+    if not yandex_interstitial_unit and yandex_java.exists():
+        if yandex_java.read_text(encoding="utf-8") != yandex_source:
+            raise ValueError("Refusing to delete a modified Yandex Ads Java bridge")
+        yandex_java.unlink()
     if not vk_interstitial_slot and ads_java.exists():
         if ads_java.read_text(encoding="utf-8") != ads_source:
             raise ValueError("Refusing to delete a modified VK Ads Java bridge")
@@ -326,21 +340,38 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     gradle_source = APP_GRADLE
     manifest_source = MANIFEST
     activity_source = FLARE_ACTIVITY
-    if vk_interstitial_slot:
-        # AndroidX was normalized above for both the offline and opt-in modes.
-        # Explicit opt-in only. Default RuStore builds remain free of ad SDK,
-        # advertising network permissions, IDs and background initialization.
+    if ads_enabled:
+        # Offline release never includes advertising SDKs. In opt-in builds
+        # network auto-initialization is disabled until explicit consent.
+        deps = []
+        if vk_interstitial_slot:
+            deps.append(f"    implementation 'com.my.target:mytarget-sdk:{VK_ADS_SDK_VERSION}'")
+            ads_java.write_text(ads_source, encoding="utf-8")
+        if yandex_interstitial_unit:
+            deps.append(f"    implementation 'com.yandex.android:mobileads:{YANDEX_ADS_SDK_VERSION}'")
+            yandex_java.write_text(yandex_source, encoding="utf-8")
         gradle_source += (
-            "\n// VK Реклама / myTarget: opt-in Android interstitial integration.\n"
-            "dependencies {\n"
-            f"    implementation 'com.my.target:mytarget-sdk:{VK_ADS_SDK_VERSION}'\n"
-            "}\n"
+            "\n// Opt-in VK/myTarget and/or Yandex Mobile Ads interstitials.\n"
+            "dependencies {\n" + "\n".join(deps) + "\n}\n"
         )
         manifest_source = manifest_source.replace(
             "    <application",
             '    <uses-permission android:name="android.permission.INTERNET" />\n\n    <application',
             1,
         )
+        if yandex_interstitial_unit:
+            manifest_source = manifest_source.replace(
+                '        android:label="@string/app_name"',
+                '        <!-- Do not initialize Yandex SDK until an explicit user choice. -->\n'
+                '        android:label="@string/app_name"',
+            )
+            manifest_source = manifest_source.replace(
+                '        <activity android:name="org.flare.app.LaunchActivity"',
+                '        <meta-data android:name="com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION"\n'
+                '            android:value="false" />\n'
+                '        <activity android:name="org.flare.app.LaunchActivity"',
+                1,
+            )
         activity_source = activity_source.replace(
             "import org.libsdl.app.SDLActivity;",
             "import android.os.Bundle;\nimport android.app.AlertDialog;\nimport org.libsdl.app.SDLActivity;",
@@ -348,47 +379,54 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         activity_source = activity_source.replace(
             "public class FLARE extends SDLActivity {",
             "public class FLARE extends SDLActivity {\n"
-            "    private VkAdsBridge vkAds;\n"
-            "    @Override protected void onCreate(Bundle state) {\n"
-            "        super.onCreate(state);\n"
-            f"        vkAds = new VkAdsBridge(this, {vk_interstitial_slot});\n"
-            "        // No ad requests before a free, explicit user choice.\n"
-            "        showAdPrivacyChoices();\n"
-            "    }\n"
-            "    private void showAdPrivacyChoices() {\n"
-            "        if (isFinishing() || isDestroyed()) return;\n"
-            "        new AlertDialog.Builder(this)\n"
-            "            .setTitle(\"VK Реклама: конфиденциальность\")\n"
-            "            .setMessage(\"При разрешении рекламы SDK VK/myTarget может передавать\\n\"\n"
-            "                + \"рекламный идентификатор, информацию об устройстве и событиях показа\\n\"\n"
-            "                + \"для подбора и измерения рекламы. Выбор добровольный: игру\\n\"\n"
-            "                + \"можно продолжить без рекламных запросов.\\n\\n\"\n"
-            "                + \"Изменить выбор можно при следующем запуске игры.\")\n"
-            "            .setPositiveButton(\"Разрешить рекламу\", (dialog, which) -> {\n"
-            "                if (vkAds != null) vkAds.setPrivacyReady(true);\n"
-            "            })\n"
-            "            .setNegativeButton(\"Без рекламы\", (dialog, which) -> {\n"
-            "                if (vkAds != null) vkAds.setPrivacyReady(false);\n"
-            "            })\n"
-            "            .setCancelable(false).show();\n"
-            "    }\n"
-            "    /** Begin the ad timer only when native gameplay is entered. */\n"
-            "    public void onGameSessionStarted() {\n"
-            "        runOnUiThread(() -> {\n"
-            "            if (vkAds != null) vkAds.onGameSessionStarted();\n"
-            "        });\n"
-            "    }\n"
-            "    /** Called only after the native engine saved an ended game session. */\n"
-            "    public void onGameSessionEnded() {\n"
-            "        runOnUiThread(() -> {\n"
-            "            if (vkAds != null) vkAds.onGameSessionEnded();\n"
-            "        });\n"
-            "    }\n",
+            + ("    private VkAdsBridge vkAds;\n" if vk_interstitial_slot else "")
+            + ("    private YandexAdsBridge yandexAds;\n" if yandex_interstitial_unit else "")
+            + "    private boolean nextNetworkVk = true;\n"
+            + "    private boolean currentNetworkVk = false;\n"
+            + "    @Override protected void onCreate(Bundle state) {\n"
+            + "        super.onCreate(state);\n"
+            + (f"        vkAds = new VkAdsBridge(this, {vk_interstitial_slot});\n" if vk_interstitial_slot else "")
+            + (f'        yandexAds = new YandexAdsBridge(this, "{yandex_interstitial_unit}");\n'
+               if yandex_interstitial_unit else "")
+            + "        showAdPrivacyChoices();\n"
+            + "    }\n"
+            + "    private void showAdPrivacyChoices() {\n"
+            + "        if (isFinishing() || isDestroyed()) return;\n"
+            + "        new AlertDialog.Builder(this)\n"
+            + f'            .setTitle("{("Реклама VK и Яндекса" if vk_interstitial_slot and yandex_interstitial_unit else "VK Реклама" if vk_interstitial_slot else "Яндекс Реклама")}: конфиденциальность")\n'
+            + f'            .setMessage("Рекламные сети {("VK/myTarget и Яндекс" if vk_interstitial_slot and yandex_interstitial_unit else "VK/myTarget" if vk_interstitial_slot else "Яндекса")} могут обрабатывать данные устройства,\\n"\n'
+            + '                + "рекламный идентификатор и события рекламы. Вы можете отказаться\\n"\n'
+            + '                + "и играть без рекламных запросов. Выбор можно изменить\\n"\n'
+            + '                + "при следующем запуске. До разрешения сеть не запрашивается.")\n'
+            + '            .setPositiveButton("Разрешить рекламу", (dialog, which) -> {\n'
+            + ('                if (vkAds != null) vkAds.setPrivacyReady(true);\n' if vk_interstitial_slot else "")
+            + ('                if (yandexAds != null) yandexAds.setPrivacyReady(true);\n' if yandex_interstitial_unit else "")
+            + '            })\n'
+            + '            .setNegativeButton("Без рекламы", (dialog, which) -> {\n'
+            + ('                if (vkAds != null) vkAds.setPrivacyReady(false);\n' if vk_interstitial_slot else "")
+            + ('                if (yandexAds != null) yandexAds.setPrivacyReady(false);\n' if yandex_interstitial_unit else "")
+            + '            })\n'
+            + '            .setCancelable(false).show();\n'
+            + '    }\n'
+            + '    /** Called by the native engine on entering gameplay. */\n'
+            + '    public void onGameSessionStarted() {\n'
+            + '        runOnUiThread(() -> {\n'
+            + ("            currentNetworkVk = nextNetworkVk;\n            nextNetworkVk = !nextNetworkVk;\n"
+               if vk_interstitial_slot and yandex_interstitial_unit
+               else ("            currentNetworkVk = true;\n" if vk_interstitial_slot else "            currentNetworkVk = false;\n"))
+            + ('            if (currentNetworkVk && vkAds != null) vkAds.onGameSessionStarted();\n' if vk_interstitial_slot else "")
+            + ('            if (!currentNetworkVk && yandexAds != null) yandexAds.onGameSessionStarted();\n' if yandex_interstitial_unit else "")
+            + '        });\n'
+            + '    }\n'
+            + '    /** No more than one network may show after a saved session. */\n'
+            + '    public void onGameSessionEnded() {\n'
+            + '        runOnUiThread(() -> {\n'
+            + ('            if (currentNetworkVk && vkAds != null) vkAds.onGameSessionEnded();\n' if vk_interstitial_slot else "")
+            + ('            if (!currentNetworkVk && yandexAds != null) yandexAds.onGameSessionEnded();\n' if yandex_interstitial_unit else "")
+            + '        });\n'
+            + '    }\n',
             1,
         )
-        # Every opt-in SDK launch offers allow/deny; default is no requests.
-        # A developer privacy policy and real slot are still release blockers.
-        ads_java.write_text(ads_source, encoding="utf-8")
 
     (app / "build.gradle").write_text(gradle_source, encoding="utf-8")
     (app / "src/main/AndroidManifest.xml").write_text(manifest_source, encoding="utf-8")
@@ -459,7 +497,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     elif gameplay_source.startswith(native_header):
         raise ValueError("Orphaned VK Ads JNI include without a known callback")
 
-    if vk_interstitial_slot:
+    if ads_enabled:
         start_anchor = "\tsecond_timer.setDuration(settings->max_frames_per_sec);"
         if gameplay_source.count(start_anchor) != 1:
             raise ValueError("Cannot find Flare gameplay session start")
@@ -542,9 +580,12 @@ def main() -> None:
     parser.add_argument("--abis", default="armeabi-v7a arm64-v8a",
                         help="Whitespace-separated Android native ABIs. Use x86_64 for emulator tests.")
     parser.add_argument("--vk-interstitial-slot", type=int, default=0,
-                        help="Opt-in VK Ads slot ID (0 = no SDK, no ads; privacy UI not implemented yet).")
+                        help="Optional VK Ads numeric slot ID. 0 disables VK SDK.")
+    parser.add_argument("--yandex-interstitial-unit", default="",
+                        help="Optional real Yandex Mobile Ads ad unit ID. Empty disables Yandex SDK.")
     args = parser.parse_args()
-    project = prepare(args.engine, args.game, args.abis, args.vk_interstitial_slot)
+    project = prepare(args.engine, args.game, args.abis, args.vk_interstitial_slot,
+                      args.yandex_interstitial_unit)
     print(f"Prepared Flare Android project: {project}")
 
 if __name__ == "__main__":
