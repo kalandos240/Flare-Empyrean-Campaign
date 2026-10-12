@@ -211,8 +211,8 @@ def instrument(source_dir: Path) -> None:
     # Observe transitions using the real menu visibility flags.
     inject(
         src / "MenuManager.cpp",
-        '\t\tqa_inventory_was_visible = inv->visible;\n',
-        '\t\tqa_inventory_was_visible = inv->visible;\n'
+        '\tqa_inventory_was_visible = inv->visible;\n',
+        '\tqa_inventory_was_visible = inv->visible;\n'
         '\t\tstatic bool qa_character_seen = false;\n'
         '\t\tstatic bool qa_powers_seen = false;\n'
         '\t\tstatic bool qa_questlog_seen = false;\n'

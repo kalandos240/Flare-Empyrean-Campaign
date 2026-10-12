@@ -282,6 +282,11 @@ class PrepareAndroidTests(unittest.TestCase):
         self.assertIn('Game Over Continue tapped', engine)
         self.assertIn('flare-death-respawn.png', workflow)
 
+    def test_menu_instrumentation_matches_original_visibility_indent(self):
+        instrument = (Path(__file__).resolve().parents[1] / "scripts/emulator_instrument.py").read_text()
+        self.assertIn("'\\tqa_inventory_was_visible = inv->visible;\\n'", instrument)
+        self.assertNotIn("'\\t\\tqa_inventory_was_visible = inv->visible;\\n'", instrument)
+
     def test_original_menu_buttons_are_covered(self):
         root = Path(__file__).resolve().parents[1]
         script = (root / "scripts/emulator_menus_test.sh").read_text()
