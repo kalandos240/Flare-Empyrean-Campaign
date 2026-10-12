@@ -29,8 +29,9 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 #include <cmath>
 #include "SharedResources.h"
 
-MenuTouchControls::MenuTouchControls()
+MenuTouchControls::MenuTouchControls(MenuManager* owner)
 	: Menu()
+	, menu(owner)
 	, move_center(0,0)
 	, move_align(Utils::ALIGN_BOTTOMLEFT)
 	, main1_center(0,0)

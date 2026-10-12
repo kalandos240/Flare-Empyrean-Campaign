@@ -23,9 +23,11 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 #include "Utils.h"
 
 class WidgetLabel;
+class MenuManager;
 
 class MenuTouchControls : public Menu {
 private:
+	MenuManager* menu;
 	void alignInput(Point& center, const Point& center_base, const int radius, const int _align);
 	void renderInput(const Point& center, const int radius, const Color& color);
 
@@ -66,7 +68,7 @@ private:
 
 	float prev_touch_scale;
 public:
-	MenuTouchControls();
+	explicit MenuTouchControls(MenuManager* owner);
 	~MenuTouchControls();
 
 	void logic();

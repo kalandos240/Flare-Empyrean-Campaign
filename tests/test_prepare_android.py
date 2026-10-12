@@ -61,6 +61,7 @@ class PrepareAndroidTests(unittest.TestCase):
             )
             (engine / "src/MenuTouchControls.cpp").write_text("upstream touch implementation")
             (engine / "src/MenuTouchControls.h").write_text("upstream touch header")
+            (engine / "src/MenuManager.cpp").write_text("\ttouch_controls = new MenuTouchControls();\n")
             (engine / "src/GameStateTitle.cpp").write_text(
                 "label_version->setText(VersionInfo::createVersionStringFull());\n"
             )
@@ -117,6 +118,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("touchFingerCount() const", (source / "InputState.h").read_text())
             self.assertEqual((source / "InputState.h").read_text().count("touchFingerCount() const"), 1)
             self.assertIn("move_finger_id", (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn("new MenuTouchControls(this)", (source / "MenuManager.cpp").read_text())
             self.assertIn('setText("Атаковать")', (source / "MenuTouchControls.cpp").read_text())
             self.assertIn('setText("Использовать")', (source / "MenuTouchControls.cpp").read_text())
             self.assertIn('setText("Навык")', (source / "MenuTouchControls.cpp").read_text())

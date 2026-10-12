@@ -250,6 +250,17 @@ def patch_android_touch_controls(engine: Path) -> None:
             raise FileNotFoundError(f"Missing upstream touch control source: {target}")
         target.write_text((replacement / filename).read_text(encoding="utf-8"), encoding="utf-8")
 
+    # MenuManager is game-specific and is NOT a SharedResources global.
+    manager_file = source / "MenuManager.cpp"
+    manager_source = manager_file.read_text(encoding="utf-8")
+    original_ctor = "\ttouch_controls = new MenuTouchControls();"
+    android_ctor = "\ttouch_controls = new MenuTouchControls(this);"
+    if android_ctor not in manager_source:
+        if manager_source.count(original_ctor) != 1:
+            raise ValueError("Cannot find original MenuTouchControls creation")
+        manager_source = manager_source.replace(original_ctor, android_ctor)
+        manager_file.write_text(manager_source, encoding="utf-8")
+
 
 def pack_campaign(engine: Path, game: Path, destination: Path) -> None:
     game_mods = ["fantasycore", "empyrean_campaign"]
