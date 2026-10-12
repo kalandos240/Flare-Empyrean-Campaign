@@ -36,6 +36,13 @@ Android version and reproducible issues in a GitHub issue.
 - The diagnostic screenshot `flare-loaded-gameplay.png` also shows the original Flare touch-control circles at the bottom left/right after the map loads. Joystick movement is being checked separately and is **not yet certified**.
 - The first test failure [#38178363395](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38178363395) was a QA coordinate miss above the Load button. Fixed by measuring the real button in the screenshot; the later test above passed.
 
+## Verified original touchscreen movement (2026-10-12)
+
+- [Android emulator regression #38235332631](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38235332631) **passed** with pinned upstream Flare and the original Empyrean campaign. The same run recreated the character, completed the original opening cinematic, wrote/preserved the real native avatar save on Android Home, reloaded the saved character via the Russian **Загрузить игру** menu, and exercised the on-screen joystick.
+- The test instrumented the unmodified upstream gameplay **only in the disposable emulator checkout** to verify both a real directional input and a measurable delta in `pc->stats.pos`: `PASSED: original Flare virtual joystick moved the real saved hero.`
+- Screenshot and log artifacts: `flare-after-joystick.png`, `flare-loaded-gameplay.png`, `flare-joystick-test.log`, downloadable from that run. The normal RuStore ARM package does **not** include the test receiver or C++ log instrumentation.
+- **Still unverified:** real-device touch ergonomics, attacks/combat, abilities, inventory/quests, long-term stability, FPS/battery, Android Back and lock/unlock cycles, and signed release installation.
+
 ## First launch and filesystem
 
 - [ ] Start with a clean installation. Confirm that the Russian progress screen
