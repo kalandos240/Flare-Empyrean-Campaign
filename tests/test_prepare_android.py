@@ -276,6 +276,9 @@ class PrepareAndroidTests(unittest.TestCase):
         self.assertIn('flare-death-screen.png', workflow)
         self.assertIn('original hero respawn reached', engine)
         self.assertIn('original hero respawn reached', script)
+        self.assertIn('continue center %d %d viewport %d %d', engine)
+        self.assertIn('continue center (\\d+)', script)
+        self.assertNotIn('height * 322 / 1000', script)
         self.assertIn('Game Over Continue tapped', engine)
         self.assertIn('flare-death-respawn.png', workflow)
 

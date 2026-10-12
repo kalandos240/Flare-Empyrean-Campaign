@@ -121,6 +121,21 @@ def instrument(source_dir: Path) -> None:
         '\tif (button_continue->checkClick()) {\n'
         '\t\tUtils::logInfo("FlarePort QA: Game Over Continue tapped");\n',
     )
+    # The real button rectangle can move with DPI/localization. Emit its
+    # actual viewport center instead of guessing an ADB pixel location.
+    inject(
+        src / "MenuGameOver.cpp",
+        '\tbutton_continue->render();\n',
+        '\tstatic bool qa_game_over_position_logged = false;\n'
+        '\tif (!qa_game_over_position_logged) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: continue center %d %d viewport %d %d",\n'
+        '\t\t\tbutton_continue->pos.x + button_continue->pos.w/2,\n'
+        '\t\t\tbutton_continue->pos.y + button_continue->pos.h/2,\n'
+        '\t\t\tsettings->view_w, settings->view_h);\n'
+        '\t\tqa_game_over_position_logged = true;\n'
+        '\t}\n'
+        '\tbutton_continue->render();\n',
+    )
     inject(
         src / "MenuGameOver.cpp",
         '\telse if (button_exit->checkClick()) {\n',

@@ -36,20 +36,30 @@ if (( shown == 0 )); then
   exit 1
 fi
 adb shell pidof "$PACKAGE" >/dev/null
-# Fantasycore original Game Over modal is centered, offset vertically by -192
-# game units; its Continue button is around screen center x, y = 0.32 h.
-read -r width height < <(python - "$SCREEN" <<'PY'
+# Extract the actual centered native button coordinates. The screenshot may
+# be a different resolution from the game's logical viewport.
+read -r continue_x continue_y < <(python - "$LOG" "$SCREEN" <<'PY'
+import re
 import struct
 import sys
-with open(sys.argv[1], 'rb') as f:
-    h = f.read(24)
-if h[:8] != b'\x89PNG\r\n\x1a\n':
+from pathlib import Path
+
+logs = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+match = re.search(r"FlarePort QA: continue center (\d+) (\d+) viewport (\d+) (\d+)", logs)
+if not match:
+    raise SystemExit("No original Game Over Continue button center logged")
+x, y, view_w, view_h = map(int, match.groups())
+with open(sys.argv[2], "rb") as image:
+    header = image.read(24)
+if header[:8] != b"\x89PNG\r\n\x1a\n":
     raise SystemExit("Invalid Game Over screenshot")
-print(*struct.unpack(">II", h[16:24]))
+screen_w, screen_h = struct.unpack(">II", header[16:24])
+if min(view_w, view_h, screen_w, screen_h) == 0 or not (0 <= x < view_w and 0 <= y < view_h):
+    raise SystemExit("Invalid Game Over Continue coordinates")
+print(round(x * screen_w / view_w), round(y * screen_h / view_h))
 PY
 )
-continue_x=$((width * 500 / 1000))
-continue_y=$((height * 322 / 1000))
+echo "Tapping actual Game Over Continue button at $continue_x,$continue_y"
 adb logcat -c || true
 adb shell input touchscreen tap "$continue_x" "$continue_y"
 respawn=0
