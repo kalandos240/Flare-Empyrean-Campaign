@@ -11,6 +11,7 @@ on:
       - 'scripts/emulator_smoke.sh'
       - 'scripts/emulator_load_test.sh'
       - 'scripts/emulator_movement_test.sh'
+      - 'scripts/emulator_hud_test.sh'
       - 'scripts/emulator_instrument.py'
       - 'scripts/assert_screen_change.py'
       - 'android/**'
@@ -115,6 +116,10 @@ jobs:
             ${{ runner.temp }}/flare-load-test.log
             ${{ runner.temp }}/flare-after-joystick.png
             ${{ runner.temp }}/flare-joystick-test.log
+            ${{ runner.temp }}/flare-inventory.png
+            ${{ runner.temp }}/flare-inventory-closed.png
+            ${{ runner.temp }}/flare-combat-touch.png
+            ${{ runner.temp }}/flare-hud-test.log
             ${{ runner.temp }}/flare-android-smoke.log
           if-no-files-found: warn
           retention-days: 7
