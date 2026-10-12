@@ -66,17 +66,26 @@ def instrument(source_dir: Path) -> None:
         '\tsave_load->loadGame();\n\tUtils::logInfo("FlarePort QA: native character save loaded");\n\tloaded = true;',
     )
 
+    # The left right-hand ring is now a dedicated native interaction input
+    # (ACCEPT) instead of an additional attack slot. Test the real callback.
+    inject(
+        src / "MenuTouchControls.cpp",
+        '\t\t\tinteract_pulse = true;\n',
+        '\t\t\tinteract_pulse = true;\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: dedicated interact button pressed ACCEPT");\n',
+    )
+
     # Test-only observability: a directional joystick event must also move
     # the real hero in the native game world (not just change pixels).
     inject(
         src / "MenuTouchControls.cpp",
-        '\t// checking for MAIN1 is redundant, as the touch event itself triggers that\n',
+        '\t// Movement and action-zone taps must not also activate MAIN1/slot 10.\n',
         '\tstatic bool qa_direction_logged = false;\n'
         '\tif (!qa_direction_logged && (inpt->pressing[Input::LEFT] || inpt->pressing[Input::RIGHT] || inpt->pressing[Input::UP] || inpt->pressing[Input::DOWN])) {\n'
         '\t\tqa_direction_logged = true;\n'
         '\t\tUtils::logInfo("FlarePort QA: virtual joystick directional input received");\n'
         '\t}\n'
-        '\t// checking for MAIN1 is redundant, as the touch event itself triggers that\n',
+        '\t// Movement and action-zone taps must not also activate MAIN1/slot 10.\n',
     )
     inject(
         src / "GameStatePlay.cpp",

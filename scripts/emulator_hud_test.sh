@@ -122,6 +122,32 @@ if (( action_queued == 0 )); then
   exit 1
 fi
 
+# The adjacent left-hand action circle is no longer a second attack.
+# It must explicitly trigger the engine's ACCEPT interaction action.
+interact_x=$((width * 807 / 1000))
+interact_y=$((height * 750 / 1000))
+echo "Tapping dedicated interaction button at $interact_x,$interact_y"
+adb logcat -c
+adb shell input touchscreen tap "$interact_x" "$interact_y"
+interact_pressed=0
+for attempt in $(seq 1 13); do
+  sleep 2
+  adb logcat -d -v time > "$LOG"
+  if grep -q 'FlarePort QA: dedicated interact button pressed ACCEPT' "$LOG"; then
+    interact_pressed=1
+    break
+  fi
+  if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOG"; then
+    echo 'Game crashed after pressing the dedicated interact button.' >&2
+    exit 1
+  fi
+done
+if (( interact_pressed == 0 )); then
+  echo 'Left action ring did not trigger ACCEPT interaction.' >&2
+  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOG" | tail -90 >&2 || true
+  exit 1
+fi
+
 adb shell pidof "$PACKAGE" >/dev/null
-echo 'PASSED: original inventory opened, rendered and closed; right-side MAIN2 action queued.'
+echo 'PASSED: inventory opens/closes; Attack activates MAIN2; Interact activates ACCEPT.'
 echo 'This validates native ability queueing, NOT hitting an actual enemy.'

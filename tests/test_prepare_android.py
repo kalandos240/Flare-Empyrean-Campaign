@@ -94,6 +94,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn('setText("Действие")', (source / "MenuTouchControls.cpp").read_text())
             self.assertIn("Input::ACCEPT", (source / "MenuTouchControls.cpp").read_text())
             self.assertIn("touchFingerId", (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn("touchFingerPosition", (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn("checkAllowMain1()", (source / "MenuTouchControls.cpp").read_text())
             self.assertIn("getExternalFilesDir", (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text())
             launcher = (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text()
             self.assertIn(CONTENT_VERSION, launcher)

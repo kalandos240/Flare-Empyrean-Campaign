@@ -154,3 +154,10 @@ Android version and reproducible issues in a GitHub issue.
 Android model and version, build SHA / GitHub Actions run ID, exact screen/map,
 steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpts
 (with any personal data removed).
+
+## Floating touch controls (Android 8+, 2026-10-12)
+
+- The previous stationary movement ring has been replaced by a **floating joystick**: touching the lower-left gameplay region anchors the stick at the finger; dragging moves the thumb, and the base follows when the thumb exceeds the travel radius. The ring hides on release.
+- The right-side rings are now labeled **«Действие»** and **«Атака»**. «Атака» executes the equipped MAIN2 action (slot 11), not two duplicate attack circles. «Действие» dispatches a one-shot **ACCEPT** event to the original engine, which handles nearby NPC conversations and loot pickup. The original campaign logic, inventory and quests are unchanged.
+- Finger IDs are tracked separately. Moving with the left thumb and holding the right-side attack button should work simultaneously; the movement thumb cannot accidentally press the right-side controls. The old touch MAIN1 attack zone is disabled only in this Android build.
+- Emulator-only QA instruments native joystick motion, attack slot 11 and the interaction-button ACCEPT dispatch. This does **not** guarantee a specific NPC or dropped item is present at the test location, so actual talk/pickup still needs interactive gameplay QA.
