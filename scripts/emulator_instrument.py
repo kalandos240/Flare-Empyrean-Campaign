@@ -101,6 +101,16 @@ def instrument(source_dir: Path) -> None:
     )
 
 
+    # Distinguish slow/backlogged cutscenes from ignored screen taps.
+    # Log only genuine clicks handled by the original Next button.
+    inject(
+        src / "GameStateCutscene.cpp",
+        '\telse if (button_advance->checkClick()) {\n\t\tskip = SKIP_NEXT;',
+        '\telse if (button_advance->checkClick()) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: intro next arrow accepted");\n'
+        '\t\tskip = SKIP_NEXT;',
+    )
+
     # The intro cutscene must *finish* before we claim playable gameplay.
     # This diagnostic marker is never injected into production APK/AAB builds.
     inject(
