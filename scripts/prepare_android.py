@@ -280,7 +280,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         )
         activity_source = activity_source.replace(
             "import org.libsdl.app.SDLActivity;",
-            "import android.os.Bundle;\nimport org.libsdl.app.SDLActivity;",
+            "import android.os.Bundle;\nimport android.app.AlertDialog;\nimport org.libsdl.app.SDLActivity;",
         )
         activity_source = activity_source.replace(
             "public class FLARE extends SDLActivity {",
@@ -289,6 +289,25 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "    @Override protected void onCreate(Bundle state) {\n"
             "        super.onCreate(state);\n"
             f"        vkAds = new VkAdsBridge(this, {vk_interstitial_slot});\n"
+            "        // No ad requests before a free, explicit user choice.\n"
+            "        showAdPrivacyChoices();\n"
+            "    }\n"
+            "    private void showAdPrivacyChoices() {\n"
+            "        if (isFinishing() || isDestroyed()) return;\n"
+            "        new AlertDialog.Builder(this)\n"
+            "            .setTitle(\"VK Реклама: конфиденциальность\")\n"
+            "            .setMessage(\"При разрешении рекламы SDK VK/myTarget может передавать\\n\"\n"
+            "                + \"рекламный идентификатор, информацию об устройстве и событиях показа\\n\"\n"
+            "                + \"для подбора и измерения рекламы. Выбор добровольный: игру\\n\"\n"
+            "                + \"можно продолжить без рекламных запросов.\\n\\n\"\n"
+            "                + \"Изменить выбор можно при следующем запуске игры.\")\n"
+            "            .setPositiveButton(\"Разрешить рекламу\", (dialog, which) -> {\n"
+            "                if (vkAds != null) vkAds.setPrivacyReady(true);\n"
+            "            })\n"
+            "            .setNegativeButton(\"Без рекламы\", (dialog, which) -> {\n"
+            "                if (vkAds != null) vkAds.setPrivacyReady(false);\n"
+            "            })\n"
+            "            .setCancelable(false).show();\n"
             "    }\n"
             "    /** Begin the ad timer only when native gameplay is entered. */\n"
             "    public void onGameSessionStarted() {\n"
@@ -304,8 +323,8 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "    }\n",
             1,
         )
-        # Privacy consent is intentionally not granted automatically:
-        # the future consent UI must explicitly call vkAds.setPrivacyReady().
+        # Every opt-in SDK launch offers allow/deny; default is no requests.
+        # A developer privacy policy and real slot are still release blockers.
         ads_java.write_text(ads_source, encoding="utf-8")
 
     (app / "build.gradle").write_text(gradle_source, encoding="utf-8")

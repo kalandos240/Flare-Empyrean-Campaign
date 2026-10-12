@@ -175,6 +175,13 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("onGameSessionStarted", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("save_load->setGameSlot(0);", cpp)
             self.assertIn("setPrivacyReady", (app / "src/main/java/org/flare/app/VkAdsBridge.java").read_text())
+            vk_activity = (app / "src/main/java/org/flare/app/FLARE.java").read_text()
+            self.assertIn("showAdPrivacyChoices()", vk_activity)
+            self.assertIn('setTitle("VK Реклама: конфиденциальность")', vk_activity)
+            self.assertIn("vkAds.setPrivacyReady(true)", vk_activity)
+            self.assertIn("vkAds.setPrivacyReady(false)", vk_activity)
+            self.assertIn("setCancelable(false)", vk_activity)
+            self.assertNotIn("showAdPrivacyChoices()", (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text())
             self.assertIn("if (save_on_exit)", cpp)
 
             # Re-running preparation with the same ad slot must not duplicate
