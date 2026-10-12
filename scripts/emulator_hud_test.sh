@@ -124,8 +124,10 @@ fi
 
 # The adjacent left-hand action circle is no longer a second attack.
 # It must explicitly trigger the engine's ACCEPT interaction action.
-interact_x=$((width * 807 / 1000))
-interact_y=$((height * 750 / 1000))
+# The original Flare bottom-right alignment positions the MAIN1 ring
+# near (1710, 765) on a 2340x1080 Pixel 5 display.
+interact_x=$((width * 731 / 1000))
+interact_y=$((height * 708 / 1000))
 echo "Tapping dedicated interaction button at $interact_x,$interact_y"
 adb logcat -c
 adb shell input touchscreen tap "$interact_x" "$interact_y"
