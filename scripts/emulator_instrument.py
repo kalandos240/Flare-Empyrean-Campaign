@@ -172,6 +172,20 @@ def instrument(source_dir: Path) -> None:
         '\t\t}\n',
     )
 
+    # These logs prove that the original touch HUD can open the actual
+    # inventory and enqueue a normal primary/secondary combat action.
+    inject(
+        src / "MenuManager.cpp",
+        '\tmenus_open = (inv->visible || pow->visible || chr->visible || questlog->visible || vendor->visible || talker->visible || book->visible || console_open);',
+        '\tmenus_open = (inv->visible || pow->visible || chr->visible || questlog->visible || vendor->visible || talker->visible || book->visible || console_open);\n'
+        '\tstatic bool qa_inventory_was_visible = false;\n'
+        '\tif (inv->visible && !qa_inventory_was_visible)\n'
+        '\t\tUtils::logInfo("FlarePort QA: original inventory menu opened");\n'
+        '\telse if (!inv->visible && qa_inventory_was_visible)\n'
+        '\t\tUtils::logInfo("FlarePort QA: original inventory menu closed");\n'
+        '\tqa_inventory_was_visible = inv->visible;\n',
+    )
+
     # Native action bar has distinct character, powers and quest-log screens.
     # Observe transitions using the real menu visibility flags.
     inject(
@@ -192,19 +206,6 @@ def instrument(source_dir: Path) -> None:
         '\t\tqa_questlog_seen = questlog->visible;\n',
     )
 
-    # These logs prove that the original touch HUD can open the actual
-    # inventory and enqueue a normal primary/secondary combat action.
-    inject(
-        src / "MenuManager.cpp",
-        '\tmenus_open = (inv->visible || pow->visible || chr->visible || questlog->visible || vendor->visible || talker->visible || book->visible || console_open);',
-        '\tmenus_open = (inv->visible || pow->visible || chr->visible || questlog->visible || vendor->visible || talker->visible || book->visible || console_open);\n'
-        '\tstatic bool qa_inventory_was_visible = false;\n'
-        '\tif (inv->visible && !qa_inventory_was_visible)\n'
-        '\t\tUtils::logInfo("FlarePort QA: original inventory menu opened");\n'
-        '\telse if (!inv->visible && qa_inventory_was_visible)\n'
-        '\t\tUtils::logInfo("FlarePort QA: original inventory menu closed");\n'
-        '\tqa_inventory_was_visible = inv->visible;\n',
-    )
     inject(
         src / "MenuActionBar.cpp",
         '\t\t\t\taction_queue.push_back(action);',
