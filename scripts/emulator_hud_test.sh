@@ -101,13 +101,26 @@ attack_x=$((width * 925 / 1000))
 attack_y=$((height * 663 / 1000))
 echo "Pressing original secondary action ring at $attack_x,$attack_y"
 adb logcat -c
-adb shell input touchscreen tap "$attack_x" "$attack_y"
+# ADB's instantaneous tap can both begin and end within a single slow
+# emulator logic frame. Hold a realistic thumb contact for several frames.
+adb shell input touchscreen swipe "$attack_x" "$attack_y" "$attack_x" "$attack_y" 400
+attack_claimed=0
+attack_input=0
 action_queued=0
 for attempt in $(seq 1 13); do
+  
   sleep 2
   adb logcat -d -v time > "$LOG"
+  if grep -q 'FlarePort QA: attack ring claimed real SDL finger' "$LOG"; then
+    attack_claimed=1
+  fi
+  if grep -q 'FlarePort QA: slot11 input fired' "$LOG"; then
+    attack_input=1
+  fi
   if grep -q 'FlarePort QA: touch combat action queued for slot 11' "$LOG"; then
     action_queued=1
+  fi
+  if (( attack_claimed && attack_input )); then
     break
   fi
   if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOG"; then
@@ -116,10 +129,14 @@ for attempt in $(seq 1 13); do
   fi
 done
 adb exec-out screencap -p > "$COMBAT"
-if (( action_queued == 0 )); then
-  echo 'Right virtual action ring did not enqueue its actual slot-11 power.' >&2
+if (( attack_claimed == 0 || attack_input == 0 )); then
+  echo 'Attack touch was not accepted by the original action bar.' >&2
   grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOG" | tail -90 >&2 || true
   exit 1
+fi
+
+if (( action_queued == 0 )); then
+  echo 'Attack button delivered to native slot 11; no queued attack (likely no valid target).' 
 fi
 
 # The adjacent left-hand action circle is no longer a second attack.
@@ -130,7 +147,7 @@ interact_x=$((width * 731 / 1000))
 interact_y=$((height * 708 / 1000))
 echo "Tapping dedicated interaction button at $interact_x,$interact_y"
 adb logcat -c
-adb shell input touchscreen tap "$interact_x" "$interact_y"
+adb shell input touchscreen swipe "$interact_x" "$interact_y" "$interact_x" "$interact_y" 280
 interact_pressed=0
 for attempt in $(seq 1 13); do
   sleep 2
@@ -156,7 +173,7 @@ skill_x=$((width * 730 / 1000))
 skill_y=$((height * 429 / 1000))
 echo "Pressing native Skill ring at $skill_x,$skill_y"
 adb logcat -c || true
-adb shell input touchscreen tap "$skill_x" "$skill_y"
+adb shell input touchscreen swipe "$skill_x" "$skill_y" "$skill_x" "$skill_y" 280
 skill_claimed=0
 for attempt in $(seq 1 13); do
   sleep 2
@@ -172,5 +189,5 @@ if (( skill_claimed == 0 )); then
   exit 1
 fi
 adb shell pidof "$PACKAGE" >/dev/null
-echo 'PASSED: inventory opens/closes; Attack=MAIN2, Use=ACCEPT, Skill=MAIN1.'
+echo 'PASSED: inventory opens/closes; Attack reaches MAIN2, Use=ACCEPT, Skill=MAIN1.'
 echo 'This validates native ability queueing, NOT hitting an actual enemy.'

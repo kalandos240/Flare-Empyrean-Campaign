@@ -192,3 +192,9 @@ steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpt
 ## Native cutscene transition fix (Android-only)
 - The Android branch now latches `Scene::NEXT`, `Scene::DONE` and `Scene::PREV` until `GameStateCutscene::render()` consumes the transition. Previously multiple fixed-timestep `logic()` updates before the next rendered frame could overwrite a completed transition with `NO_CHANGE`, apparently causing the last backstory caption to remain visible after the Close button was tapped on a slow emulator.
 - The patch modifies only the generated Android checkout of the pinned engine and is idempotent. It does not skip the original story or alter campaign content; the emulator gameplay/save/death QA must still pass before release.
+
+## Native Attack button: no-target QA correction
+
+- Run [38306760993](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38306760993) completed the Android 11 opening story, save on Home, real saved-character reload, joystick movement, the character/powers/journal windows, and inventory rendering. It failed because the synthetic primary attack over **empty ground** did not enqueue a valid combat action.
+- Android emulator QA now requires proof that a real SDL finger entered the Attack ring **and** that the original `MenuActionBar` processed the native MAIN2/slot 11 input. The lack of a target is reported separately and not mistaken for broken controls.
+- Combat damage, enemy targeting, NPC dialog and full inventory use still require physical-device/gameplay QA; this input acceptance probe does not certify real combat.

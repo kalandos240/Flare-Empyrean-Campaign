@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from xml.etree import ElementTree as ET
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -259,6 +260,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn('com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION', yandex_manifest)
             self.assertIn('android:value="false"', yandex_manifest)
             self.assertIn("android.permission.INTERNET", yandex_manifest)
+            ET.fromstring(yandex_manifest)  # Compile test must reject malformed Android XML.
             yandex_activity = (app / "src/main/java/org/flare/app/FLARE.java").read_text()
             self.assertIn("new YandexAdsBridge(this, \"R-M-CI-PLACEHOLDER\")", yandex_activity)
             self.assertIn('setTitle("Яндекс Реклама: конфиденциальность")', yandex_activity)
@@ -284,6 +286,7 @@ class PrepareAndroidTests(unittest.TestCase):
             combined_gradle = (app / "build.gradle").read_text()
             self.assertIn("mytarget-sdk:5.52.5", combined_gradle)
             self.assertIn("mobileads:8.5.0", combined_gradle)
+            ET.fromstring((app / "src/main/AndroidManifest.xml").read_text())
             native = (engine / "src/GameStatePlay.cpp").read_text()
             self.assertEqual(native.count('GetMethodID(clazz, "onGameSessionEnded", "()V")'), 1)
             prepare(engine, game, vk_interstitial_slot=314159,
@@ -376,6 +379,12 @@ class PrepareAndroidTests(unittest.TestCase):
         for menu in ("character", "powers", "questlog"):
             self.assertIn(menu, script)
         self.assertIn("bash scripts/emulator_menus_test.sh", (root / "scripts/emulator_smoke.sh").read_text())
+        instrument = (root / "scripts/emulator_instrument.py").read_text()
+        hud = (root / "scripts/emulator_hud_test.sh").read_text()
+        self.assertIn("attack ring claimed real SDL finger", instrument)
+        self.assertIn("slot11 input fired", instrument)
+        self.assertIn("attack ring claimed real SDL finger", hud)
+        self.assertIn("slot11 input fired", hud)
 
     def test_emulator_intro_progress_has_native_state_markers(self):
         root = Path(__file__).resolve().parents[1]

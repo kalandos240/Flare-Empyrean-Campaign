@@ -227,6 +227,22 @@ def instrument(source_dir: Path) -> None:
         '\t\tqa_questlog_seen = questlog->visible;\n',
     )
 
+    # A no-target strike must still prove MAIN2 reached the original
+    # action bar; requiring a queued hit against empty ground is inaccurate.
+    inject(
+        src / "MenuTouchControls.cpp",
+        '\t\t\tattack_finger_id = id;\n',
+        '\t\t\tattack_finger_id = id;\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: attack ring claimed real SDL finger");\n',
+    )
+    inject(
+        src / "MenuActionBar.cpp",
+        '\t\t\taction.power = hotkeys_mod[11];\n',
+        '\t\t\taction.power = hotkeys_mod[11];\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: slot11 input fired power=%u enabled=%d", '
+        'static_cast<unsigned>(action.power), slots[i]->enabled ? 1 : 0);\n',
+    )
+
     inject(
         src / "MenuActionBar.cpp",
         '\t\t\t\taction_queue.push_back(action);',

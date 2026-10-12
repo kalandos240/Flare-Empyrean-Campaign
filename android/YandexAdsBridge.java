@@ -3,8 +3,6 @@ package org.flare.app;
 import android.os.SystemClock;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import com.yandex.mobile.ads.common.AdError;
 import com.yandex.mobile.ads.common.AdRequest;
@@ -83,7 +81,7 @@ final class YandexAdsBridge {
             @Override public void onAdShown() {
                 Log.i(TAG, "Interstitial displayed at a saved-game break");
             }
-            @Override public void onAdFailedToShow(@NonNull AdError error) {
+            @Override public void onAdFailedToShow(AdError error) {
                 cleanup(ad);
                 loadNext();
             }
@@ -92,7 +90,7 @@ final class YandexAdsBridge {
                 loadNext();
             }
             @Override public void onAdClicked() {}
-            @Override public void onAdImpression(@Nullable ImpressionData data) {}
+            @Override public void onAdImpression(ImpressionData data) {}
         });
         try {
             ad.show(activity);
@@ -108,7 +106,7 @@ final class YandexAdsBridge {
         if (!privacyReady || loader == null || pendingAd != null || adUnitId.isEmpty()) return;
         try {
             loader.loadAd(new AdRequest.Builder(adUnitId).build(), new InterstitialAdLoadListener() {
-                @Override public void onAdLoaded(@NonNull InterstitialAd ad) {
+                @Override public void onAdLoaded(InterstitialAd ad) {
                     if (!privacyReady) {
                         ad.setAdEventListener(null);
                         return;
@@ -116,7 +114,7 @@ final class YandexAdsBridge {
                     discardAd();
                     pendingAd = ad;
                 }
-                @Override public void onAdFailedToLoad(@NonNull AdRequestError error) {
+                @Override public void onAdFailedToLoad(AdRequestError error) {
                     // No automatic retries. Another session or launch may retry.
                     Log.i(TAG, "No Yandex interstitial available; game continues");
                 }
