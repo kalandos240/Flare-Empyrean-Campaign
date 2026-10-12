@@ -11,6 +11,8 @@ on:
       - 'scripts/prepare_android.py'
       - 'tests/test_prepare_android.py'
       - 'android/LaunchActivity.java'
+      - 'android/CampaignPathValidator.java'
+      - 'tests/java/**'
       - 'README.md'
 
 permissions:
@@ -41,6 +43,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Check Java campaign archive paths
+        run: |
+          mkdir -p "$RUNNER_TEMP/flare-java-tests"
+          javac -d "$RUNNER_TEMP/flare-java-tests" android/CampaignPathValidator.java tests/java/CampaignPathValidatorTest.java
+          java -cp "$RUNNER_TEMP/flare-java-tests" org.flare.app.CampaignPathValidatorTest
 
       - name: Install Android NDK and platform
         run: |

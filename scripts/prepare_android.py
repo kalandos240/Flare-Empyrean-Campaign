@@ -287,6 +287,10 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         (Path(__file__).resolve().parents[1] / "android/LaunchActivity.java").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
+    (java / "CampaignPathValidator.java").write_text(
+        (Path(__file__).resolve().parents[1] / "android/CampaignPathValidator.java").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     strings = app / "src/main/res/values/strings.xml"
     strings.write_text(
         '<resources><string name="app_name">Flare: Empyrean Campaign</string></resources>\n',

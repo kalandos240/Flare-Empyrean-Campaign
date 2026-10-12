@@ -64,6 +64,13 @@ Android version and reproducible issues in a GitHub issue.
 - Emulator-only `QaReceiver.inspect` now checks that no temporary asset remains after successful first installation. The receiver remains prohibited in release APKs.
 - These checks are **not** a physical-device certification. Test low-disk-space interruption and interrupted updates on a disposable device.
 
+## Campaign archive path isolation (2026-10-12)
+
+- The installer uses a pure Java validator for both installed ZIP entries and their temporary `.flare-installing` paths. Only children of `mods/` and `licenses/` are accepted. Other app-private paths (especially `userdata/saves/`) are explicitly inaccessible to the installer.
+- Traversal like `mods/../userdata/saves/avatar.txt`, dot segments, duplicate separators, backslashes, null bytes, and symlink redirects are rejected.
+- A standalone JVM regression test checks these cases, including symlinks to save files. The JVM test runs in all Android CI workflows and is not bundled into release APKs.
+- This protects against malformed campaign archives but does not replace physical-device install/upgrade QA.
+
 ## First launch and filesystem
 
 - [ ] Start with a clean installation. Confirm that the Russian progress screen

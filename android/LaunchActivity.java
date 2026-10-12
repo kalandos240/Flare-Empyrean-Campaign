@@ -168,7 +168,7 @@ public final class LaunchActivity extends Activity {
             throw new IOException("Недостаточно свободного места для игровых файлов");
         }
 
-        final String rootPrefix = root.getCanonicalPath() + File.separator;
+        // Asset writes must never enter userdata/, config/ or saves/.
         byte[] buffer = new byte[64 * 1024];
         int extractedFiles = 0;
         long extractedBytes = 0L;
@@ -187,15 +187,7 @@ public final class LaunchActivity extends Activity {
                 if (!seenEntries.add(entryName)) {
                     throw new IOException("Повторяющийся ресурс в архиве: " + entryName);
                 }
-                // Campaign data may only populate these app-owned directories.
-                if (!entryName.startsWith("mods/")
-                        && !entryName.startsWith("licenses/")) {
-                    throw new IOException("Неожиданный ресурс: " + entryName);
-                }
-                File destination = new File(root, entryName);
-                if (!destination.getCanonicalPath().startsWith(rootPrefix)) {
-                    throw new IOException("Недопустимый путь в игровом архиве");
-                }
+                File destination = CampaignPathValidator.resolve(root, entryName);
 
                 if (entry.isDirectory()) {
                     if (!destination.isDirectory() && !destination.mkdirs()) {
@@ -208,10 +200,7 @@ public final class LaunchActivity extends Activity {
                     }
                     // Never overwrite a valid installed asset with half an
                     // extracted file if Android kills the process or disk fills.
-                    File pending = new File(parent, destination.getName() + ".flare-installing");
-                    if (!pending.getCanonicalPath().startsWith(rootPrefix)) {
-                        throw new IOException("Недопустимый путь временного ресурса");
-                    }
+                    File pending = CampaignPathValidator.resolve(root, entryName + ".flare-installing");
                     boolean committed = false;
                     long fileBytes = 0L;
                     try {

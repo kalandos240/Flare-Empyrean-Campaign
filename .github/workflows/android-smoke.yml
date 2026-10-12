@@ -16,6 +16,7 @@ on:
       - 'scripts/emulator_instrument.py'
       - 'scripts/assert_screen_change.py'
       - 'android/**'
+      - 'tests/java/**'
 
 permissions:
   contents: read
@@ -44,6 +45,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Check Java campaign archive paths
+        run: |
+          mkdir -p "$RUNNER_TEMP/flare-java-tests"
+          javac -d "$RUNNER_TEMP/flare-java-tests" android/CampaignPathValidator.java tests/java/CampaignPathValidatorTest.java
+          java -cp "$RUNNER_TEMP/flare-java-tests" org.flare.app.CampaignPathValidatorTest
 
       - name: Install NDK
         run: |
