@@ -43,6 +43,7 @@ class PrepareAndroidTests(unittest.TestCase):
             (game / "mods/fantasycore").mkdir(parents=True)
             (game / "mods/empyrean_campaign").mkdir(parents=True)
 
+            (engine / "flare-android-project/gradle.properties").write_text("android.useAndroidX=false\n")
             (app / "build.gradle").write_text("old")
             (jni / "Application.mk").write_text("APP_ABI := armeabi-v7a arm64-v8a x86 x86_64\n")
             (engine / "src/GameStatePlay.cpp").write_text(
@@ -99,6 +100,7 @@ class PrepareAndroidTests(unittest.TestCase):
             default_gradle = (app / "build.gradle").read_text()
             default_manifest = (app / "src/main/AndroidManifest.xml").read_text()
             self.assertNotIn("com.my.target:mytarget-sdk", default_gradle)
+            self.assertIn("android.useAndroidX=false", (engine / "flare-android-project/gradle.properties").read_text())
             self.assertNotIn("android.permission.INTERNET", default_manifest)
             self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
             self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
@@ -129,6 +131,7 @@ class PrepareAndroidTests(unittest.TestCase):
             # Opt-in source generation and dependency wiring, no live ad requests.
             prepare(engine, game, abis="x86_64", vk_interstitial_slot=314159)
             self.assertIn("com.my.target:mytarget-sdk:5.52.5", (app / "build.gradle").read_text())
+            self.assertIn("android.useAndroidX=true", (engine / "flare-android-project/gradle.properties").read_text())
             self.assertIn("android.permission.INTERNET", (app / "src/main/AndroidManifest.xml").read_text())
             self.assertIn("new VkAdsBridge(this, 314159)", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertTrue((app / "src/main/java/org/flare/app/VkAdsBridge.java").is_file())
