@@ -1,0 +1,81 @@
+name: VK Ads optional Android compile
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - port/rustore-android-foundation
+    paths:
+      - '.github/workflows/android-vk-ads-compile.yml'
+      - 'android/VkAdsBridge.java'
+      - 'scripts/prepare_android.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flare-vk-ads-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  optional-sdk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test both ad-free and opt-in configuration generation
+        run: python -m unittest discover -s tests -v
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install native build tools
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$PATH"
+          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned upstream Flare engine and campaign
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          git init upstream/flare-engine
+          git -C upstream/flare-engine remote add origin https://github.com/flareteam/flare-engine.git
+          git -C upstream/flare-engine fetch --depth 1 origin 1969baeb89ebf94cf22e2bc2ed4e3d8413714d4f
+          git -C upstream/flare-engine checkout --detach FETCH_HEAD
+          git -C upstream/flare-engine submodule update --init --recursive
+          git init upstream/flare-game
+          git -C upstream/flare-game remote add origin https://github.com/flareteam/flare-game.git
+          git -C upstream/flare-game fetch --depth 1 origin af6eee6d339ac98011864bfe89da837fe7769c28
+          git -C upstream/flare-game checkout --detach FETCH_HEAD
+
+      - name: Generate optional VK Ads build with compile-only placeholder slot
+        run: |
+          python scripts/prepare_android.py \
+            --engine upstream/flare-engine --game upstream/flare-game \
+            --abis x86_64 --vk-interstitial-slot 1
+          grep -q "com.my.target:mytarget-sdk:5.52.5" upstream/flare-engine/flare-android-project/app/build.gradle
+          grep -q 'onGameSessionEnded' upstream/flare-engine/src/GameStatePlay.cpp
+          test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/VkAdsBridge.java
+
+      - name: Compile actual VK Ads Java bridge and native engine
+        working-directory: upstream/flare-engine/flare-android-project
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Verify opt-in library included
+        run: |
+          set -euo pipefail
+          APK=upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$APK" | grep -q 'android.permission.INTERNET'
+          echo 'Optional VK SDK compiled successfully. Test slot 1 is invalid and this APK must NOT be published.'
+          # Intentionally never upload the placeholder-slot APK.
