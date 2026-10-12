@@ -56,6 +56,15 @@ public final class CampaignPathValidatorTest {
             Path pending = folder.resolve("mods/default/hero.png.flare-installing");
             Files.createSymbolicLink(pending, folder.resolve("userdata/saves/avatar.txt"));
             rejects(root, "mods/default/hero.png.flare-installing");
+            Files.delete(pending);
+            // Broken symlinks must also be rejected (getCanonicalPath alone
+            // can incorrectly treat these as ordinary nonexistent files).
+            Files.createSymbolicLink(pending, folder.resolve("userdata/saves/not-created.txt"));
+            rejects(root, "mods/default/hero.png.flare-installing");
+            Files.delete(pending);
+            Path intermediate = folder.resolve("mods/default/shortcut");
+            Files.createSymbolicLink(intermediate, folder.resolve("userdata/saves/missing-dir"));
+            rejects(root, "mods/default/shortcut/deep/file.png");
         } finally {
             try (java.util.stream.Stream<Path> paths = Files.walk(folder)) {
                 paths.sorted(Comparator.reverseOrder()).forEach(path -> {
