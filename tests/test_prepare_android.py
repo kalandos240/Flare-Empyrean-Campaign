@@ -63,6 +63,20 @@ class PrepareAndroidTests(unittest.TestCase):
             (engine / "src/GameStateTitle.cpp").write_text(
                 "label_version->setText(VersionInfo::createVersionStringFull());\n"
             )
+            (engine / "src/GameStateCutscene.cpp").write_text(
+                "void GameStateCutscene::logic() {\n"
+                "\tif (scene_index < scenes.size())\n"
+                "\t\tstatus = scenes[scene_index]->logic();\n"
+                "}\n"
+                "void GameStateCutscene::render() {\n"
+                "\t\telse if (status == Scene::PREV && scene_index > 0) {\n"
+                "\t\t\tscenes[scene_index]->reset();\n"
+                "\t\t\tscene_index--;\n"
+                "\t\t\tscenes[scene_index]->reset();\n"
+                "\t\t}\n"
+                "\t}\n"
+                "}\n"
+            )
             (engine / "src/PlatformAndroid.cpp").write_text(
                 "void Platform::setPaths() { old(); }\nvoid other() {}\n"
             )
@@ -87,6 +101,10 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("versionName '0.2.0'", (app / "build.gradle").read_text())
             self.assertIn('label_version->setText("Android 8.0+")',
                           (engine / "src/GameStateTitle.cpp").read_text())
+            cutscene_source = (engine / "src/GameStateCutscene.cpp").read_text()
+            self.assertIn("scene_index < scenes.size() && status == Scene::NO_CHANGE", cutscene_source)
+            self.assertIn("status = Scene::NO_CHANGE;", cutscene_source)
+            self.assertEqual(cutscene_source.count("status = Scene::NO_CHANGE;"), 1)
 
             self.assertNotIn("minSdk 24", (app / "build.gradle").read_text())
             self.assertEqual((jni / "Application.mk").read_text(), "APP_ABI := armeabi-v7a arm64-v8a\n")

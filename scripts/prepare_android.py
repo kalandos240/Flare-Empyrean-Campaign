@@ -176,6 +176,52 @@ def patch_android_title_branding(engine: Path) -> None:
         raise ValueError("Cannot find title version field in pinned Flare engine")
 
 
+def patch_android_cutscene_status(engine: Path) -> None:
+    """Keep native scene transitions latched across several logic ticks.
+
+    Fixed-timestep engines may call logic() repeatedly before render().
+    In upstream Flare the previous Scene::NEXT / DONE status gets replaced by
+    NO_CHANGE before render() can advance to the next scene. The final
+    cinematic Close button can consequently remain on-screen forever.
+    This Android-specific fix does not skip campaign story or change timing.
+    """
+    path = engine / "src/GameStateCutscene.cpp"
+    if not path.is_file():
+        raise FileNotFoundError(f"Missing upstream native cutscene state: {path}")
+    source = path.read_text(encoding="utf-8")
+    edits = [
+        (
+            "\tif (scene_index < scenes.size())\n"
+            "\t\tstatus = scenes[scene_index]->logic();",
+            "\t// Preserve a pending transition until render() has consumed it.\n"
+            "\tif (scene_index < scenes.size() && status == Scene::NO_CHANGE)\n"
+            "\t\tstatus = scenes[scene_index]->logic();",
+        ),
+        (
+            "\t\telse if (status == Scene::PREV && scene_index > 0) {\n"
+            "\t\t\tscenes[scene_index]->reset();\n"
+            "\t\t\tscene_index--;\n"
+            "\t\t\tscenes[scene_index]->reset();\n"
+            "\t\t}\n"
+            "\t}\n}\n",
+            "\t\telse if (status == Scene::PREV && scene_index > 0) {\n"
+            "\t\t\tscenes[scene_index]->reset();\n"
+            "\t\t\tscene_index--;\n"
+            "\t\t\tscenes[scene_index]->reset();\n"
+            "\t\t}\n"
+            "\t\t// A transition is consumed exactly once, after native render.\n"
+            "\t\tstatus = Scene::NO_CHANGE;\n"
+            "\t}\n}\n",
+        ),
+    ]
+    for original, updated in edits:
+        if source.count(original) == 1:
+            source = source.replace(original, updated)
+        elif source.count(updated) != 1:
+            raise ValueError(f"Unexpected native cutscene structure: {path}")
+    path.write_text(source, encoding="utf-8")
+
+
 def patch_android_touch_controls(engine: Path) -> None:
     """Use finger-specific floating controls only in this Android port."""
     source = engine / "src"
@@ -473,6 +519,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
 
     patch_android_touch_controls(engine)
     patch_android_title_branding(engine)
+    patch_android_cutscene_status(engine)
     patch_sdl_makefiles(app / "src/main/jni")
 
     # Store defaults to ARM ABIs; --abis x86_64 enables separate emulator smoke builds.

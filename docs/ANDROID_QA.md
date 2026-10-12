@@ -188,3 +188,7 @@ steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpt
 - Android 8 (API 26) native startup + touch character creation passed in [GitHub Actions run 38300804346](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38300804346).
 - The Android 11 native game reached its illustrated original backstory. All 32 tap events on the original Next/Close icon were acknowledged in SDL; the last caption and close icon still remained on screen. Gameplay/save/death checks could not run in that job.
 - Added **emulator-only** logging of exact original Scene subscene progress, `Scene::NEXT` completion and `GameStateCutscene` index transition; no gameplay code is modified in production. Follow-up runs should distinguish an actual cutscene deadlock from a test-observability bug.
+
+## Native cutscene transition fix (Android-only)
+- The Android branch now latches `Scene::NEXT`, `Scene::DONE` and `Scene::PREV` until `GameStateCutscene::render()` consumes the transition. Previously multiple fixed-timestep `logic()` updates before the next rendered frame could overwrite a completed transition with `NO_CHANGE`, apparently causing the last backstory caption to remain visible after the Close button was tapped on a slow emulator.
+- The patch modifies only the generated Android checkout of the pinned engine and is idempotent. It does not skip the original story or alter campaign content; the emulator gameplay/save/death QA must still pass before release.
