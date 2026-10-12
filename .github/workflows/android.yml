@@ -184,17 +184,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "name='com.kalandos240.flareempyrean'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "versionCode='4'"
-          unzip -Z1 "$APK" | grep -q '^assets/campaign.zip
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: flare-empyrean-android-unsigned
-          path: |
-            upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/*.apk
-            upstream/flare-engine/flare-android-project/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-          retention-days: 14
-
+          unzip -Z1 "$APK" | grep -Fqx 'assets/campaign.zip'
           NAME='flare-empyrean-0.2.2-rustore-signed.apk'
           cp "$APK" "$RUNNER_TEMP/$NAME"
           (cd "$RUNNER_TEMP" && sha256sum "$NAME" > "$NAME.sha256")
