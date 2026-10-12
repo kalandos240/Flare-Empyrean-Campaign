@@ -9,6 +9,7 @@ on:
       - '.github/workflows/android-vk-ads-compile.yml'
       - 'android/VkAdsBridge.java'
       - 'scripts/prepare_android.py'
+      - 'tests/test_prepare_android.py'
 
 permissions:
   contents: read
