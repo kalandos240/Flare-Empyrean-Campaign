@@ -129,9 +129,10 @@ def instrument(source_dir: Path) -> None:
     )
     inject(
         src / "GameStatePlay.cpp",
-        '\tif (pc->respawn) {\n',
+        '\tif (pc->respawn) {\n\t\tpc->stats.alive = true;\n',
         '\tif (pc->respawn) {\n'
-        '\t\tUtils::logInfo("FlarePort QA: original hero respawn reached");\n',
+        '\t\tUtils::logInfo("FlarePort QA: original hero respawn reached");\n'
+        '\t\tpc->stats.alive = true;\n',
     )
 
     # Test-only observability: a directional joystick event must also move

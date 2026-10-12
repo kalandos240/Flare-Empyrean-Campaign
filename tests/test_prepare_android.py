@@ -256,6 +256,12 @@ class PrepareAndroidTests(unittest.TestCase):
         self.assertIn("qa_pause_was_visible", instrument)
         self.assertIn("src / \"MenuManager.cpp\"", instrument)
 
+    def test_respawn_marker_targets_health_reset_not_hud_log(self):
+        src = (Path(__file__).resolve().parents[1] / "scripts/emulator_instrument.py").read_text()
+        self.assertIn("'\\tif (pc->respawn) {\\n\\t\\tpc->stats.alive = true;\\n'", src)
+        self.assertIn('FlarePort QA: original hero respawn reached', src)
+        self.assertNotIn("'\\tif (pc->respawn) {\\n',", src)
+
     def test_death_end_to_end_uses_test_only_request(self):
         root = Path(__file__).resolve().parents[1]
         receiver = (root / "android/QaReceiver.java").read_text()
