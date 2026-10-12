@@ -92,6 +92,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("move_finger_id", (source / "MenuTouchControls.cpp").read_text())
             self.assertIn('setText("Атаковать")', (source / "MenuTouchControls.cpp").read_text())
             self.assertIn('setText("Использовать")', (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn('setText("Навык")', (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn("skill_finger_id != -1", (source / "MenuTouchControls.cpp").read_text())
             self.assertIn("Input::ACCEPT", (source / "MenuTouchControls.cpp").read_text())
             self.assertIn("touchFingerId", (source / "MenuTouchControls.cpp").read_text())
             self.assertIn("touchFingerPosition", (source / "MenuTouchControls.cpp").read_text())

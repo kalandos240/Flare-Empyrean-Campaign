@@ -46,6 +46,11 @@ private:
 	int main2_align;
 
 	int radius_padding;
+	// The third Android button activates the configured MAIN1 power (slot 10).
+	int skill_radius;
+	Point skill_center;
+	long int skill_finger_id;
+	WidgetLabel* skill_label;
 	// Track each contact separately, rather than following SDL's single mouse
 	// pointer. The movement base floats under the initiating thumb.
 	long int move_finger_id;

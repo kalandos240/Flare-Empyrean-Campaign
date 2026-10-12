@@ -66,6 +66,14 @@ def instrument(source_dir: Path) -> None:
         '\tsave_load->loadGame();\n\tUtils::logInfo("FlarePort QA: native character save loaded");\n\tloaded = true;',
     )
 
+    # Emit diagnostics only when the third ring really claims an SDL finger.
+    inject(
+        src / "MenuTouchControls.cpp",
+        '\t\t\tskill_finger_id = id;\n',
+        '\t\t\tskill_finger_id = id;\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: skill ring accepted MAIN1 slot 10");\n',
+    )
+
     # The left right-hand ring is now a dedicated native interaction input
     # (ACCEPT) instead of an additional attack slot. Test the real callback.
     inject(

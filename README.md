@@ -22,7 +22,7 @@ two pinned upstream revisions and creates an Android app from them:
 - Targets ARMv7 and ARM64 to avoid large unused x86 shared libraries in RuStore builds.
 - Includes a machine-readable campaign file count/uncompressed-size manifest and APK permission/ABI audits in CI.
 - Configures app identifier `com.kalandos240.flareempyrean`, Android 8.0+ (min API 26) and target API 35.
-- Uses the original Russian localization and gameplay, with an Android-specific **floating** left joystick, clearly labeled **«Атаковать»** (native MAIN2) and **«Использовать»** (native ACCEPT: speak, pick up, use) rings. Input is tracked by individual fingers so movement and attacks can overlap.
+- Uses the original Russian localization and gameplay, with an Android-specific **floating** left joystick, clearly labeled **«Атаковать»** (native MAIN2), **«Использовать»** (native ACCEPT: speak, pick up, use), and **«Навык»** (assignable native MAIN1 power slot 10) rings. Input is tracked by individual fingers so movement and attacks can overlap.
 - Includes automated Python packaging tests and an Android GitHub Actions build.
 
 **Status:** Preliminary native Android port. The APK/AAB build and on-device gameplay

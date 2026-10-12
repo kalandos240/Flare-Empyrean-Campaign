@@ -150,6 +150,27 @@ if (( interact_pressed == 0 )); then
   exit 1
 fi
 
+# Skill is a separate third ring above Use, assigned to native MAIN1 (slot 10).
+# The ring center is derived from the native Flare Android geometry.
+skill_x=$((width * 730 / 1000))
+skill_y=$((height * 429 / 1000))
+echo "Pressing native Skill ring at $skill_x,$skill_y"
+adb logcat -c || true
+adb shell input touchscreen tap "$skill_x" "$skill_y"
+skill_claimed=0
+for attempt in $(seq 1 13); do
+  sleep 2
+  adb logcat -d -v time > "$LOG"
+  if grep -q 'FlarePort QA: skill ring accepted MAIN1 slot 10' "$LOG"; then
+    skill_claimed=1
+    break
+  fi
+done
+if (( skill_claimed == 0 )); then
+  echo 'Dedicated Skill ring failed to select native MAIN1.' >&2
+  grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOG" | tail -75 >&2 || true
+  exit 1
+fi
 adb shell pidof "$PACKAGE" >/dev/null
-echo 'PASSED: inventory opens/closes; Attack activates MAIN2; Interact activates ACCEPT.'
+echo 'PASSED: inventory opens/closes; Attack=MAIN2, Use=ACCEPT, Skill=MAIN1.'
 echo 'This validates native ability queueing, NOT hitting an actual enemy.'
