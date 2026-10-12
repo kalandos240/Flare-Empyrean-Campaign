@@ -74,7 +74,7 @@ Android version and reproducible issues in a GitHub issue.
 
 ## Android 8.0 minimum-version acceptance
 
-- The **API 26** emulator test builds and installs the real pinned Flare engine and Empyrean Campaign, confirms the SDL activity and live process, checks the native original-title-render marker, and uploads a screenshot. This is a first-launch compatibility check, not a complete campaign test.
+- The **API 26** emulator test builds and installs the real pinned Flare engine and Empyrean Campaign, confirms the SDL activity, original title rendering, native touchscreen **Играть** and **Создать** actions, and construction of the original gameplay state. It captures the character creator and opening cutscene screenshots. It does **not** run the full campaign, save/load, or enemy combat scenarios.
 - The separate **API 30** emulator job runs the full first-launch, character creation, cutscene, persistence, saved-character reload, joystick, inventory and action-button regression sequence.
 - Both runs use an x86_64 test-only build with diagnostic hooks; production RuStore ARM APK/AAB are compiled and audited separately.
 - Both matrix jobs must succeed for the overall emulator workflow to pass.

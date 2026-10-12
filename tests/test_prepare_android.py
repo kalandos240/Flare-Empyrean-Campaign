@@ -191,6 +191,20 @@ class PrepareAndroidTests(unittest.TestCase):
             )
 
 
+    def test_android_8_smoke_reaches_native_character_creation(self):
+        root = Path(__file__).resolve().parents[1]
+        smoke = (root / "scripts/emulator_smoke.sh").read_text()
+        workflow = (root / ".github/workflows/android-smoke.yml").read_text()
+        self.assertIn("FLARE_SMOKE_CREATOR_ONLY=1", workflow)
+        self.assertIn("api_level: [26, 30]", workflow)
+        self.assertIn("FlarePort QA: gameplay state constructed", smoke)
+        self.assertIn("FLARE_SMOKE_CREATOR_ONLY", smoke)
+        self.assertNotIn("FLARE_SMOKE_BOOT_ONLY", smoke)
+        self.assertLess(
+            smoke.index("FlarePort QA: gameplay state constructed"),
+            smoke.index('if [[ "${FLARE_SMOKE_CREATOR_ONLY:-0}" == 1 ]]'),
+        )
+
     def test_manifest_launch_is_exported_and_sdl_is_private(self):
         self.assertIn('android:name="org.flare.app.LaunchActivity"', MANIFEST)
         self.assertIn('android:exported="true"', MANIFEST)

@@ -78,13 +78,10 @@ TITLE_SCREEN="$DIAGNOSTICS/flare-native-start.png"
 CHARACTER_SCREEN="$DIAGNOSTICS/flare-character-creation.png"
 adb exec-out screencap -p > "$TITLE_SCREEN"
 
-# Android 8 (API 26) baseline: validate first-run extraction, real SDL
-# activity, live process, original engine title rendering and screenshot.
-# Keep the much longer campaign/save/input scenario on Android 11 (API 30).
-if [[ "${FLARE_SMOKE_BOOT_ONLY:-0}" == 1 ]]; then
-  echo 'PASSED: Android 8 baseline native campaign startup and title rendering.'
-  exit 0
-fi
+# Both supported emulator APIs must demonstrate that the *original* Android
+# title Play action opens the original native character creator by touch.
+# Android 8 stops after the creator successfully constructs a gameplay state;
+# Android 11 continues through the full intro and save/load regression.
 
 read -r tap_x tap_y create_x create_y < <(python - "$TITLE_SCREEN" <<'PY'
 import struct
@@ -189,6 +186,17 @@ if [[ "$gameplay_open" != 1 ]]; then
   grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -95 >&2 || true
   exit 1
 fi
+
+# API 26 compatibility check: native title, real touchscreen Play/Create,
+# game-state construction and visible intro. The API 30 job tests save/load.
+if [[ "${FLARE_SMOKE_CREATOR_ONLY:-0}" == 1 ]]; then
+  sleep 5
+  adb exec-out screencap -p > "$DIAGNOSTICS/flare-intro.png"
+  adb shell pidof "$PACKAGE" >/dev/null
+  echo 'PASSED: Android 8 original touchscreen character creation and native gameplay-state construction.'
+  exit 0
+fi
+
 # The official campaign starts with a mandatory illustrated backstory after
 # creating the hero. Record it separately: it is not the playable map!
 sleep 10
