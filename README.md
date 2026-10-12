@@ -21,7 +21,7 @@ two pinned upstream revisions and creates an Android app from them:
 - Adds a separate Android launcher and explicit Android 12+ activity visibility settings.
 - Targets ARMv7 and ARM64 to avoid large unused x86 shared libraries in RuStore builds.
 - Includes a machine-readable campaign file count/uncompressed-size manifest and APK permission/ABI audits in CI.
-- Configures app identifier `com.kalandos240.flareempyrean`, API 24+ and target API 35.
+- Configures app identifier `com.kalandos240.flareempyrean`, Android 8.0+ (min API 26) and target API 35.
 - Reuses the original game's in-engine mobile/touch control UI and Russian localization.
 - Includes automated Python packaging tests and an Android GitHub Actions build.
 

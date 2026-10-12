@@ -69,7 +69,7 @@ Android version and reproducible issues in a GitHub issue.
 - The installer uses a pure Java validator for both installed ZIP entries and their temporary `.flare-installing` paths. Only children of `mods/` and `licenses/` are accepted. Other app-private paths (especially `userdata/saves/`) are explicitly inaccessible to the installer.
 - Traversal like `mods/../userdata/saves/avatar.txt`, dot segments, duplicate separators, backslashes, null bytes, and symlink redirects are rejected.
 - A standalone JVM regression test checks these cases, including existing symlink redirects to save files. Temporary resources use exclusive `createNewFile()` creation so even dangling symlinks cannot be followed by `FileOutputStream`. A broken directory link fails the installer's `mkdirs()` check.
-- The Android production validator uses only APIs available on **minSdk 24**. Avoid `java.nio.file.Files.isSymbolicLink()` here: Android added it only in API 26. The JVM-only test may use Java NIO.
+- **Minimum Android 8.0 (API 26)**. The production validator uses `java.nio.file.Files.isSymbolicLink()` to reject existing and dangling symlinks at every archive path component, plus exclusive temporary file creation as defense in depth.
 - This protects against malformed campaign archives but does not replace physical-device install/upgrade QA.
 
 ## First launch and filesystem
@@ -120,7 +120,7 @@ Android version and reproducible issues in a GitHub issue.
 - [ ] Switch to another app, return, and save after the transition.
 - [ ] Test the Android Back button/gesture at menu, gameplay and dialogue screens.
 - [ ] Try 20+ minutes of combat, changing zones and loading a saved game.
-- [ ] Test on Android 7+ (minimum API 24) and Android 15+ where devices are available.
+- [ ] Test on **Android 8.0+ (minimum API 26)** and Android 15+ where devices are available. Android 7.x (API 24–25) is intentionally unsupported.
 - [ ] Record peak RAM, smoothness, asset unpacking time and actual disk usage.
 
 ## Store publication gates

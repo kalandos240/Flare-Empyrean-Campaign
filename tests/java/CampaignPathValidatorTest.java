@@ -54,12 +54,16 @@ public final class CampaignPathValidatorTest {
             Path redirect = folder.resolve("mods/default/redirect");
             Files.createSymbolicLink(redirect, folder.resolve("userdata/saves"));
             rejects(root, "mods/default/redirect/avatar.txt");
+            Path internalAlias = folder.resolve("mods/default/internal-alias");
+            Files.createSymbolicLink(internalAlias, folder.resolve("mods/default"));
+            rejects(root, "mods/default/internal-alias/hero.png");
             Path pending = folder.resolve("mods/default/hero.png.flare-installing");
             Files.createSymbolicLink(pending, folder.resolve("userdata/saves/avatar.txt"));
             rejects(root, "mods/default/hero.png.flare-installing");
             Path dangling = folder.resolve("mods/default/dangling.flare-installing");
             Files.createSymbolicLink(dangling, folder.resolve("userdata/saves/not-created.txt"));
-            // The validator may not resolve a dangling link on all JVMs.
+            rejects(root, "mods/default/dangling.flare-installing");
+            // Exclusive temporary file creation is an additional safeguard.
             // The Android installer additionally uses exclusive creation,
             // which must reject the link rather than follow it.
             try {
@@ -74,6 +78,7 @@ public final class CampaignPathValidatorTest {
             // by the installer's isDirectory()/mkdirs() preparation.
             Path missingParent = folder.resolve("mods/default/missing-link");
             Files.createSymbolicLink(missingParent, folder.resolve("userdata/saves/not-a-directory"));
+            rejects(root, "mods/default/missing-link/hero.png");
             File parent = missingParent.toFile();
             if (parent.isDirectory() || parent.mkdirs()) {
                 throw new AssertionError("Installer would enter a dangling directory symlink");
