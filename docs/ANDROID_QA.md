@@ -43,6 +43,13 @@ Android version and reproducible issues in a GitHub issue.
 - Screenshot and log artifacts: `flare-after-joystick.png`, `flare-loaded-gameplay.png`, `flare-joystick-test.log`, downloadable from that run. The normal RuStore ARM package does **not** include the test receiver or C++ log instrumentation.
 - **Still unverified:** real-device touch ergonomics, attacks/combat, abilities, inventory/quests, long-term stability, FPS/battery, Android Back and lock/unlock cycles, and signed release installation.
 
+## Verified touchscreen movement and release audit (2026-10-12)
+
+- [Full Android emulator flow #38235332631](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38235332631) **passed**: first-run install, Russian title, touchscreen character creation, all eight backstory stages, first playable map, engine autosave on Home, restart, original saved-game menu, native `SaveLoad::loadGame()`, and **virtual-joystick hero movement** on a real loaded map. The test-only engine logs both `virtual joystick directional input received` and `hero moved 0.35 -0.35` (distance over half a tile), with before/after gameplay screenshots in the workflow artifact.
+- [RuStore ARM debug APK / unsigned release AAB #38235670534](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38235670534) **passed** including an audit that rejects any accidentally packaged exported emulator-only `QaReceiver`.
+- The preceding [emulator run #38179949594](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38179949594) failed during cutscene progression (before joystick testing). The successful replacement now records genuine Next-button acceptance and captures screenshots when a slow emulator is delayed.
+- **Still open:** touch attacks, skill actions, inventory and quest UI, combat, real-device ARM testing, audio lifecycle, full progression and store signing/publication. A passing emulator movement test does not imply these areas have been certified.
+
 ## First launch and filesystem
 
 - [ ] Start with a clean installation. Confirm that the Russian progress screen
