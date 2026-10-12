@@ -121,6 +121,12 @@ def instrument(source_dir: Path) -> None:
         '\tif (button_continue->checkClick()) {\n'
         '\t\tUtils::logInfo("FlarePort QA: Game Over Continue tapped");\n',
     )
+    inject(
+        src / "MenuGameOver.cpp",
+        '#include "SharedResources.h"\n',
+        '#include "SharedResources.h"\n#include "Settings.h"\n',
+    )
+
     # The real button rectangle can move with DPI/localization. Emit its
     # actual viewport center instead of guessing an ADB pixel location.
     inject(
