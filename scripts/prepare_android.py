@@ -214,6 +214,18 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     manifest_source = MANIFEST
     activity_source = FLARE_ACTIVITY
     if vk_interstitial_slot:
+        # Opt-in VK SDK 5.52.5 pulls in AndroidX Media3 and AndroidX Core;
+        # upstream Flare explicitly disables AndroidX for its offline build.
+        # Enable it ONLY when myTarget is part of the generated project.
+        gradle_properties = project / "gradle.properties"
+        gradle_options = gradle_properties.read_text(encoding="utf-8")
+        old_option = "android.useAndroidX=false"
+        if gradle_options.count(old_option) != 1:
+            raise ValueError("Expected upstream AndroidX=false project configuration")
+        gradle_properties.write_text(
+            gradle_options.replace(old_option, "android.useAndroidX=true"),
+            encoding="utf-8",
+        )
         # Explicit opt-in only. Default RuStore builds remain free of ad SDK,
         # advertising network permissions, IDs and background initialization.
         gradle_source += (
