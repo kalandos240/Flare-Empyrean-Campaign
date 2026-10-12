@@ -143,6 +143,7 @@ jobs:
             ${{ runner.temp }}/flare-back-resume.png
             ${{ runner.temp }}/flare-back-test.log
             ${{ runner.temp }}/flare-death-screen.png
+            ${{ runner.temp }}/flare-death-respawn.png
             ${{ runner.temp }}/flare-death-test.log
             ${{ runner.temp }}/flare-android-smoke.log
           if-no-files-found: warn

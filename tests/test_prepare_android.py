@@ -268,6 +268,10 @@ class PrepareAndroidTests(unittest.TestCase):
         self.assertIn('original Game Over dialog displayed', script)
         self.assertIn('bash scripts/emulator_death_test.sh', (root / "scripts/emulator_smoke.sh").read_text())
         self.assertIn('flare-death-screen.png', workflow)
+        self.assertIn('original hero respawn reached', engine)
+        self.assertIn('original hero respawn reached', script)
+        self.assertIn('Game Over Continue tapped', engine)
+        self.assertIn('flare-death-respawn.png', workflow)
 
     def test_original_menu_buttons_are_covered(self):
         root = Path(__file__).resolve().parents[1]

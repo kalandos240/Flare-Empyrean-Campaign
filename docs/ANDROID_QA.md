@@ -180,3 +180,5 @@ steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpt
 - The original in-game title's engine/platform version label is replaced during the Android packaging step with `Android 8.0+`. This does not modify the original source credits or open-source licenses.
 - The app release candidate now uses Android `versionCode 2` / `versionName 0.2.0`; package identifier remains identical, allowing normal update installation over 0.1.0 (saves remain in app-owned storage).
 - The emulator startup script treats a transient `adb logcat -c` failure on API 26 as nonfatal but still requires actual native startup/gameplay markers and checks for crashes. This addresses the previous Android 8 CI failure at log clearing.
+
+- The follow-up **Continue** button is tapped in the real Game Over modal; an emulator-only marker in `GameStatePlay` confirms that the original hero respawn code ran. The native save/config sentinel is checked again after respawn. Screenshots are collected for the death and respawn screens. Exact UI positioning on a physical device remains unverified.

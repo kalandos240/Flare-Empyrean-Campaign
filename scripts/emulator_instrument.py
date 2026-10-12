@@ -112,7 +112,26 @@ def instrument(source_dir: Path) -> None:
         '\tif (game_over->visible && !qa_gameover_logged) {\n'
         '\t\tUtils::logInfo("FlarePort QA: original Game Over dialog displayed");\n'
         '\t\tqa_gameover_logged = true;\n'
-        '\t}\n',
+        '\t}\n'
+        '\tif (!game_over->visible) qa_gameover_logged = false;\n',
+    )
+    inject(
+        src / "MenuGameOver.cpp",
+        '\tif (button_continue->checkClick()) {\n',
+        '\tif (button_continue->checkClick()) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: Game Over Continue tapped");\n',
+    )
+    inject(
+        src / "MenuGameOver.cpp",
+        '\telse if (button_exit->checkClick()) {\n',
+        '\telse if (button_exit->checkClick()) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: Game Over Exit tapped");\n',
+    )
+    inject(
+        src / "GameStatePlay.cpp",
+        '\tif (pc->respawn) {\n',
+        '\tif (pc->respawn) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: original hero respawn reached");\n',
     )
 
     # Test-only observability: a directional joystick event must also move
