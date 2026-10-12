@@ -159,6 +159,34 @@ def patch_sdl_makefiles(jni: Path) -> None:
             )
         makefile.write_text(content, encoding="utf-8")
 
+def patch_android_touch_controls(engine: Path) -> None:
+    """Use finger-specific floating controls only in this Android port."""
+    source = engine / "src"
+    state = source / "InputState.h"
+    if not state.is_file():
+        raise FileNotFoundError(f"Missing upstream touch input interface: {state}")
+    original = state.read_text(encoding="utf-8")
+    methods = (
+        "\t// Separate contacts enable moving and attacking simultaneously.\n"
+        "\tsize_t touchFingerCount() const { return touch_fingers.size(); }\n"
+        "\tlong int touchFingerId(size_t i) const { return touch_fingers[i].id; }\n"
+        "\tPoint touchFingerPosition(size_t i) const { return touch_fingers[i].pos; }\n\n"
+    )
+    anchor = "protected:\n\tPoint scaleMouse("
+    if methods not in original:
+        if original.count(anchor) != 1:
+            raise ValueError("Unexpected upstream InputState touch interface")
+        original = original.replace(anchor, methods + anchor)
+        state.write_text(original, encoding="utf-8")
+
+    replacement = Path(__file__).resolve().parents[1] / "android/native"
+    for filename in ("MenuTouchControls.cpp", "MenuTouchControls.h"):
+        target = source / filename
+        if not target.is_file():
+            raise FileNotFoundError(f"Missing upstream touch control source: {target}")
+        target.write_text((replacement / filename).read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def pack_campaign(engine: Path, game: Path, destination: Path) -> None:
     game_mods = ["fantasycore", "empyrean_campaign"]
     directory_sources = [
@@ -407,6 +435,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
 
     gameplay.write_text(gameplay_source, encoding="utf-8")
 
+    patch_android_touch_controls(engine)
     patch_sdl_makefiles(app / "src/main/jni")
 
     # Store defaults to ARM ABIs; --abis x86_64 enables separate emulator smoke builds.

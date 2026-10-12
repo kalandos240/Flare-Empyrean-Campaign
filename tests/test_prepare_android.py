@@ -53,6 +53,13 @@ class PrepareAndroidTests(unittest.TestCase):
                 "\t\tsetRequestedGameState(new GameStateTitle());\n"
                 "\n\t\tsave_load->setGameSlot(0);\n"
             )
+            # The Android port copies its real native touch implementation
+            # into the detached engine checkout on every preparation.
+            (engine / "src/InputState.h").write_text(
+                "class InputState {\npublic:\nprotected:\n\tPoint scaleMouse(unsigned x, unsigned y);\n};\n"
+            )
+            (engine / "src/MenuTouchControls.cpp").write_text("upstream touch implementation")
+            (engine / "src/MenuTouchControls.h").write_text("upstream touch header")
             (engine / "src/PlatformAndroid.cpp").write_text(
                 "void Platform::setPaths() { old(); }\nvoid other() {}\n"
             )
@@ -79,6 +86,14 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertEqual((jni / "Application.mk").read_text(), "APP_ABI := x86_64\n")
             with self.assertRaises(ValueError):
                 prepare(engine, game, abis="INVALID_ABI")
+            source = engine / "src"
+            self.assertIn("touchFingerCount() const", (source / "InputState.h").read_text())
+            self.assertEqual((source / "InputState.h").read_text().count("touchFingerCount() const"), 1)
+            self.assertIn("move_finger_id", (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn('setText("Атака")', (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn('setText("Действие")', (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn("Input::ACCEPT", (source / "MenuTouchControls.cpp").read_text())
+            self.assertIn("touchFingerId", (source / "MenuTouchControls.cpp").read_text())
             self.assertIn("getExternalFilesDir", (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text())
             launcher = (app / "src/main/java/org/flare/app/LaunchActivity.java").read_text()
             self.assertIn(CONTENT_VERSION, launcher)
