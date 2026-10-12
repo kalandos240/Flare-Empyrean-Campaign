@@ -182,3 +182,9 @@ steps to reproduce, expected behavior, actual behavior, and `adb logcat` excerpt
 - The emulator startup script treats a transient `adb logcat -c` failure on API 26 as nonfatal but still requires actual native startup/gameplay markers and checks for crashes. This addresses the previous Android 8 CI failure at log clearing.
 
 - The follow-up **Continue** button is tapped in the real Game Over modal; an emulator-only marker in `GameStatePlay` confirms that the original hero respawn code ran. The native save/config sentinel is checked again after respawn. Screenshots are collected for the death and respawn screens. Exact UI positioning on a physical device remains unverified.
+
+
+## Intro cutscene Android 11 regression (2026-10-12)
+- Android 8 (API 26) native startup + touch character creation passed in [GitHub Actions run 38300804346](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38300804346).
+- The Android 11 native game reached its illustrated original backstory. All 32 tap events on the original Next/Close icon were acknowledged in SDL; the last caption and close icon still remained on screen. Gameplay/save/death checks could not run in that job.
+- Added **emulator-only** logging of exact original Scene subscene progress, `Scene::NEXT` completion and `GameStateCutscene` index transition; no gameplay code is modified in production. Follow-up runs should distinguish an actual cutscene deadlock from a test-observability bug.

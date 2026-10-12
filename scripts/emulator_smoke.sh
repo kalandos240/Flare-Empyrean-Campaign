@@ -229,6 +229,8 @@ for page in $(seq 1 32); do
   next_count="$(grep -c 'FlarePort QA: intro next arrow accepted' "$LOGFILE" || true)"
   if (( page % 4 == 0 )); then
     echo "Original cutscene Next button accepted $next_count taps so far."
+    grep 'FlarePort QA: scene advance' "$LOGFILE" | tail -4 || true
+    grep -E 'FlarePort QA: original scene completed|FlarePort QA: cutscene scene index advanced' "$LOGFILE" | tail -4 || true
     adb exec-out screencap -p > "$DIAGNOSTICS/flare-intro-progress.png"
   fi
   if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
@@ -240,6 +242,7 @@ if [[ "$intro_finished" != 1 ]]; then
   adb exec-out screencap -p > "$DIAGNOSTICS/flare-intro-stuck.png"
   echo "Backstory not completed; original Next accepted $next_count taps." >&2
   grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -80 >&2 || true
+  echo "Intro diagnostics: native Next inputs and scene index state are included above." >&2
   exit 1
 fi
 

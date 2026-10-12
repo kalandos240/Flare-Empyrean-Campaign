@@ -298,6 +298,18 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn(menu, script)
         self.assertIn("bash scripts/emulator_menus_test.sh", (root / "scripts/emulator_smoke.sh").read_text())
 
+    def test_emulator_intro_progress_has_native_state_markers(self):
+        root = Path(__file__).resolve().parents[1]
+        instrument = (root / "scripts/emulator_instrument.py").read_text()
+        smoke = (root / "scripts/emulator_smoke.sh").read_text()
+        for marker in (
+            "FlarePort QA: scene advance",
+            "FlarePort QA: original scene completed",
+            "FlarePort QA: cutscene scene index advanced",
+        ):
+            self.assertIn(marker, instrument)
+        self.assertIn("FlarePort QA: scene advance", smoke)
+
     def test_manifest_launch_is_exported_and_sdl_is_private(self):
         self.assertIn('android:name="org.flare.app.LaunchActivity"', MANIFEST)
         self.assertIn('android:exported="true"', MANIFEST)

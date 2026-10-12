@@ -267,6 +267,33 @@ def instrument(source_dir: Path) -> None:
     )
 
 
+    # For Android QA, identify exactly where the original introductory
+    # cutscene gets stuck: subscene change, Scene::NEXT or state transition.
+    inject(
+        src / "GameStateCutscene.cpp",
+        '\telse if (button_advance->checkClick()) {\n\t\tskip = SKIP_NEXT;',
+        '\telse if (button_advance->checkClick()) {\n'
+        '\t\tUtils::logInfo("FlarePort QA: scene advance %u/%u last=%d", '
+        'static_cast<unsigned>(sub_index), static_cast<unsigned>(subscenes.size()), is_last_scene ? 1 : 0);\n'
+        '\t\tskip = SKIP_NEXT;',
+    )
+    inject(
+        src / "GameStateCutscene.cpp",
+        '\t\tif (sub_index >= subscenes.size() || subscenes[sub_index] >= components.size())\n'
+        '\t\t\treturn NEXT;',
+        '\t\tif (sub_index >= subscenes.size() || subscenes[sub_index] >= components.size()) {\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: original scene completed");\n'
+        '\t\t\treturn NEXT;\n'
+        '\t\t}',
+    )
+    inject(
+        src / "GameStateCutscene.cpp",
+        '\t\telse if (status == Scene::NEXT) {\n\t\t\tscene_index++;',
+        '\t\telse if (status == Scene::NEXT) {\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: cutscene scene index advanced");\n'
+        '\t\t\tscene_index++;',
+    )
+
     # Distinguish slow/backlogged cutscenes from ignored screen taps.
     # Log only genuine clicks handled by the original Next button.
     inject(
