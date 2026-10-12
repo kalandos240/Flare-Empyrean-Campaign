@@ -94,6 +94,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("seenEntries.add(entryName)", launcher)
             self.assertIn("CampaignPathValidator.resolve(root, entryName)", launcher)
             self.assertIn("CampaignPathValidator.resolve(root, entryName + \".flare-installing\")", launcher)
+            self.assertIn("pending.createNewFile()", launcher)
             self.assertTrue((app / "src/main/java/org/flare/app/CampaignPathValidator.java").is_file())
             self.assertIn("renameTo(marker)", launcher)
             self.assertNotIn("MANAGE_EXTERNAL_STORAGE", (app / "src/main/AndroidManifest.xml").read_text())

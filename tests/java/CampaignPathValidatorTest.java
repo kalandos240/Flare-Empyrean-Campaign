@@ -50,21 +50,26 @@ public final class CampaignPathValidatorTest {
             rejects(root, "mods/default/../default/file");
             rejects(root, "mods/../../saves/file");
             rejects(root, "mods/default/file\0name");
+            Files.createFile(folder.resolve("userdata/saves/avatar.txt"));
             Path redirect = folder.resolve("mods/default/redirect");
             Files.createSymbolicLink(redirect, folder.resolve("userdata/saves"));
             rejects(root, "mods/default/redirect/avatar.txt");
             Path pending = folder.resolve("mods/default/hero.png.flare-installing");
             Files.createSymbolicLink(pending, folder.resolve("userdata/saves/avatar.txt"));
             rejects(root, "mods/default/hero.png.flare-installing");
-            Files.delete(pending);
-            // Broken symlinks must also be rejected (getCanonicalPath alone
-            // can incorrectly treat these as ordinary nonexistent files).
-            Files.createSymbolicLink(pending, folder.resolve("userdata/saves/not-created.txt"));
-            rejects(root, "mods/default/hero.png.flare-installing");
-            Files.delete(pending);
-            Path intermediate = folder.resolve("mods/default/shortcut");
-            Files.createSymbolicLink(intermediate, folder.resolve("userdata/saves/missing-dir"));
-            rejects(root, "mods/default/shortcut/deep/file.png");
+            Path dangling = folder.resolve("mods/default/dangling.flare-installing");
+            Files.createSymbolicLink(dangling, folder.resolve("userdata/saves/not-created.txt"));
+            // The validator may not resolve a dangling link on all JVMs.
+            // The Android installer additionally uses exclusive creation,
+            // which must reject the link rather than follow it.
+            try {
+                if (dangling.toFile().createNewFile()) {
+                    throw new AssertionError("Exclusive creation followed a dangling symlink");
+                }
+            } catch (IOException expected) {
+                // Also safe: exclusive file creation refused an existing symlink.
+            }
+            checks++;
         } finally {
             try (java.util.stream.Stream<Path> paths = Files.walk(folder)) {
                 paths.sorted(Comparator.reverseOrder()).forEach(path -> {

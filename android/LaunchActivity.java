@@ -201,6 +201,15 @@ public final class LaunchActivity extends Activity {
                     // Never overwrite a valid installed asset with half an
                     // extracted file if Android kills the process or disk fills.
                     File pending = CampaignPathValidator.resolve(root, entryName + ".flare-installing");
+                    // createNewFile() uses exclusive creation: even a dangling
+                    // symlink is never followed into a player's save file.
+                    // A previous interrupted install may leave a partial temp.
+                    if (pending.exists() && !pending.delete()) {
+                        throw new IOException("Не удалось удалить неполный ресурс: " + entryName);
+                    }
+                    if (!pending.createNewFile()) {
+                        throw new IOException("Временный файл ресурса уже существует: " + entryName);
+                    }
                     boolean committed = false;
                     long fileBytes = 0L;
                     try {
