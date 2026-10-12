@@ -47,6 +47,7 @@ class PrepareAndroidTests(unittest.TestCase):
             (app / "build.gradle").write_text("old")
             (jni / "Application.mk").write_text("APP_ABI := armeabi-v7a arm64-v8a x86 x86_64\n")
             (engine / "src/GameStatePlay.cpp").write_text(
+                "\tsecond_timer.setDuration(settings->max_frames_per_sec);\n"
                 "\t\tsnd->stopMusic();\n"
                 "\t\tshowLoading();\n"
                 "\t\tsetRequestedGameState(new GameStateTitle());\n"
