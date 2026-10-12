@@ -150,14 +150,22 @@ PY
 # Otherwise that earlier completion could make this check pass after a single tap.
 adb logcat -c
 intro_finished=0
-for page in $(seq 1 16); do
-  echo "Advancing backstory page $page via native touchscreen arrow"
+last_next_count=0
+# On resource-constrained GitHub emulators input events may take several frames
+# to process. Verify actual Next-button clicks, not just ADB tap completion.
+for page in $(seq 1 32); do
+  echo "Advancing backstory tap $page at $skip_x,$skip_y"
   adb shell input touchscreen tap "$skip_x" "$skip_y"
-  sleep 2
+  sleep 3
   adb logcat -d -v time > "$LOGFILE"
   if grep -q 'FlarePort QA: intro cutscene finished' "$LOGFILE"; then
     intro_finished=1
     break
+  fi
+  next_count="$(grep -c 'FlarePort QA: intro next arrow accepted' "$LOGFILE" || true)"
+  if (( page % 4 == 0 )); then
+    echo "Original cutscene Next button accepted $next_count taps so far."
+    adb exec-out screencap -p > "$DIAGNOSTICS/flare-intro-progress.png"
   fi
   if grep -Eq 'FATAL EXCEPTION|Fatal signal' "$LOGFILE"; then
     echo 'The game crashed while playing its opening cutscene.' >&2
@@ -165,7 +173,8 @@ for page in $(seq 1 16); do
   fi
 done
 if [[ "$intro_finished" != 1 ]]; then
-  echo 'The original backstory could not be completed using touchscreen arrows.' >&2
+  adb exec-out screencap -p > "$DIAGNOSTICS/flare-intro-stuck.png"
+  echo "Backstory not completed; original Next accepted $next_count taps." >&2
   grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOGFILE" | tail -80 >&2 || true
   exit 1
 fi
