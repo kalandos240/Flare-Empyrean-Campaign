@@ -101,6 +101,9 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("minSdk 26", (app / "build.gradle").read_text())
             self.assertIn("versionCode 4", (app / "build.gradle").read_text())
             self.assertIn("versionName '0.2.2'", (app / "build.gradle").read_text())
+            self.assertIn("FLARE_RELEASE_KEYSTORE_PATH", (app / "build.gradle").read_text())
+            self.assertIn("FLARE_RELEASE_KEYSTORE_PASSWORD", (app / "build.gradle").read_text())
+            self.assertIn("keyAlias 'flare'", (app / "build.gradle").read_text())
             self.assertIn('label_version->setText("Android 8.0+")',
                           (engine / "src/GameStateTitle.cpp").read_text())
             cutscene_source = (engine / "src/GameStateCutscene.cpp").read_text()

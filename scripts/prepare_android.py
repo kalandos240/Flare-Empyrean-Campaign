@@ -20,6 +20,11 @@ APP_GRADLE = """plugins {
     id 'com.android.application'
 }
 
+// The keystore never lives in source control. A release APK is signed only
+// when the build explicitly supplies a local keystore path and password.
+def flareStorePath = System.getenv('FLARE_RELEASE_KEYSTORE_PATH')
+def flareStorePassword = System.getenv('FLARE_RELEASE_KEYSTORE_PASSWORD')
+
 android {
     namespace 'org.flare.app'
     compileSdk 35
@@ -38,9 +43,23 @@ android {
         }
     }
 
+    if (flareStorePath && flareStorePassword) {
+        signingConfigs {
+            release {
+                storeFile file(flareStorePath)
+                storePassword flareStorePassword
+                keyAlias 'flare'
+                keyPassword flareStorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            if (flareStorePath && flareStorePassword) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

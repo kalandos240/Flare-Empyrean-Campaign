@@ -154,6 +154,67 @@ jobs:
           done
           exit 1
 
+      - name: Build and publish publisher-signed RuStore APK when secrets are available
+        if: github.ref == 'refs/heads/port/rustore-android-foundation'
+        shell: bash
+        env:
+          FLARE_KEYSTORE_BASE64: ${{ secrets.FLARE_KEYSTORE_BASE64 }}
+          FLARE_KEYSTORE_PASSWORD: ${{ secrets.FLARE_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The previous debug and AAB builds never require publisher secrets.
+          if [[ -z "$FLARE_KEYSTORE_BASE64" || -z "$FLARE_KEYSTORE_PASSWORD" ]]; then
+            echo 'Publisher signing secrets are not configured; skipping signed APK.'
+            exit 0
+          fi
+          export FLARE_RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/flare-release.jks"
+          export FLARE_RELEASE_KEYSTORE_PASSWORD="$FLARE_KEYSTORE_PASSWORD"
+          umask 077
+          printf '%s' "$FLARE_KEYSTORE_BASE64" | base64 --decode > "$FLARE_RELEASE_KEYSTORE_PATH"
+          unset FLARE_KEYSTORE_BASE64 FLARE_KEYSTORE_PASSWORD
+          test -s "$FLARE_RELEASE_KEYSTORE_PATH"
+          trap 'rm -f "$FLARE_RELEASE_KEYSTORE_PATH"' EXIT
+          cd upstream/flare-engine/flare-android-project
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleRelease
+          cd ../..
+          APK='flare-engine/flare-android-project/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "name='com.kalandos240.flareempyrean'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "versionCode='4'"
+          unzip -Z1 "$APK" | grep -q '^assets/campaign.zip
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flare-empyrean-android-unsigned
+          path: |
+            upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/*.apk
+            upstream/flare-engine/flare-android-project/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+          NAME='flare-empyrean-0.2.2-rustore-signed.apk'
+          cp "$APK" "$RUNNER_TEMP/$NAME"
+          (cd "$RUNNER_TEMP" && sha256sum "$NAME" > "$NAME.sha256")
+          TAG='android-v0.2.2-rustore-signed'
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease \
+              --title 'Flare: Empyrean Campaign 0.2.2 — publisher-signed RuStore APK' \
+              --notes 'Android 8.0+ publisher-signed APK (versionCode 4). Uses publisher keystore from GitHub Actions Secrets. No advertising SDKs are enabled. Confirm RuStore review and publisher signing certificate before publication.'
+          fi
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" "$RUNNER_TEMP/$NAME" "$RUNNER_TEMP/$NAME.sha256" \
+              --repo "$GITHUB_REPOSITORY" --clobber; then
+              echo "Signed APK published to https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
       - name: Upload debug install and unsigned AAB
         uses: actions/upload-artifact@v4
         if: success()
