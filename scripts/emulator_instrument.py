@@ -71,7 +71,7 @@ def instrument(source_dir: Path) -> None:
         src / "MenuTouchControls.cpp",
         '\t\t\tskill_finger_id = id;\n',
         '\t\t\tskill_finger_id = id;\n'
-        '\t\t\tUtils::logInfo("FlarePort QA: skill ring accepted MAIN1 slot 10");\n',
+        '\t\t\tUtils::logInfo("FlarePort QA: skill ring accepted MAIN2 slot 11");\n',
     )
 
     # The left right-hand ring is now a dedicated native interaction input
@@ -160,13 +160,13 @@ def instrument(source_dir: Path) -> None:
     # the real hero in the native game world (not just change pixels).
     inject(
         src / "MenuTouchControls.cpp",
-        '\t// Movement and action-zone taps must not also activate MAIN1/slot 10.\n',
+        '\t// The original Empyrean Campaign uses slot 10 (MAIN1) for basic\n',
         '\tstatic bool qa_direction_logged = false;\n'
         '\tif (!qa_direction_logged && (inpt->pressing[Input::LEFT] || inpt->pressing[Input::RIGHT] || inpt->pressing[Input::UP] || inpt->pressing[Input::DOWN])) {\n'
         '\t\tqa_direction_logged = true;\n'
         '\t\tUtils::logInfo("FlarePort QA: virtual joystick directional input received");\n'
         '\t}\n'
-        '\t// Movement and action-zone taps must not also activate MAIN1/slot 10.\n',
+        '\t// The original Empyrean Campaign uses slot 10 (MAIN1) for basic\n',
     )
     inject(
         src / "GameStatePlay.cpp",
@@ -237,9 +237,9 @@ def instrument(source_dir: Path) -> None:
     )
     inject(
         src / "MenuActionBar.cpp",
-        '\t\t\taction.power = hotkeys_mod[11];\n',
-        '\t\t\taction.power = hotkeys_mod[11];\n'
-        '\t\t\tUtils::logInfo("FlarePort QA: slot11 input fired power=%u enabled=%d", '
+        '\t\t\taction.power = hotkeys_mod[10];\n',
+        '\t\t\taction.power = hotkeys_mod[10];\n'
+        '\t\t\tUtils::logInfo("FlarePort QA: slot10 input fired power=%u enabled=%d", '
         'static_cast<unsigned>(action.power), slots[i]->enabled ? 1 : 0);\n',
     )
 

@@ -17,6 +17,8 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 
 #include "FontEngine.h"
 #include "InputState.h"
+#include "MenuActionBar.h"
+#include "MenuManager.h"
 #include "MenuTouchControls.h"
 #include "Platform.h"
 #include "RenderDevice.h"
@@ -36,6 +38,7 @@ MenuTouchControls::MenuTouchControls()
 	, main2_center(0,0)
 	, main2_align(Utils::ALIGN_BOTTOMRIGHT)
 	, skill_finger_id(-1)
+	, hotbar_finger_id(-1)
 	, skill_label(new WidgetLabel())
 	, move_finger_id(-1)
 	, attack_finger_id(-1)
@@ -76,17 +79,17 @@ void MenuTouchControls::alignInput(Point& center, const Point& center_base, cons
 }
 
 void MenuTouchControls::align() {
-	move_radius = static_cast<int>(settings->view_h / 4 * settings->touch_scale);
+	move_radius = static_cast<int>(settings->view_h / 5 * settings->touch_scale);
 	move_center_base.x = move_radius;
 	move_center_base.y = -(move_radius / 2);
 	move_deadzone = static_cast<int>(settings->view_h / 20 * settings->touch_scale);
 
 	main1_radius = static_cast<int>(settings->view_h / 6 * settings->touch_scale);
-	main1_center_base.x = -main1_radius - static_cast<int>((settings->view_h / 4) * settings->touch_scale);
+	main1_center_base.x = -main1_radius - static_cast<int>((settings->view_h * 9 / 40) * settings->touch_scale);
 	main1_center_base.y = static_cast<int>((settings->view_h / 8) * settings->touch_scale * -1);
 
 	main2_radius = static_cast<int>(settings->view_h / 6 * settings->touch_scale);
-	main2_center_base.x = 0;
+	main2_center_base.x = -static_cast<int>((settings->view_h / 40) * settings->touch_scale);
 	main2_center_base.y = static_cast<int>((settings->view_h / 6) * settings->touch_scale * -1);
 
 	radius_padding = static_cast<int>(settings->view_h / 20 * settings->touch_scale);
@@ -97,14 +100,14 @@ void MenuTouchControls::align() {
 	alignInput(main2_center, main2_center_base, main2_radius, main2_align);
 	// Above the Use ring, clear of the action bar and the Attack ring.
 	skill_center.x = main1_center.x;
-	skill_center.y = std::max(skill_radius, main1_center.y - main1_radius - skill_radius - radius_padding);
+	skill_center.y = std::max(skill_radius, main1_center.y - main1_radius - skill_radius - radius_padding / 3);
 }
 
 void MenuTouchControls::logic() {
 	// The default engine has only one synthetic mouse position, which breaks
 	// simultaneous thumb movement and attack. Track real SDL finger IDs.
 	if (!visible || !settings->touchscreen || settings->mouse_move) {
-		move_finger_id = attack_finger_id = interact_finger_id = skill_finger_id = -1;
+		move_finger_id = attack_finger_id = interact_finger_id = skill_finger_id = hotbar_finger_id = -1;
 		move_active = false;
 		if (interact_pulse) {
 			inpt->pressing[Input::ACCEPT] = false;
@@ -128,6 +131,7 @@ void MenuTouchControls::logic() {
 	}
 
 	bool move_found = false;
+	bool hotbar_found = false;
 	bool attack_found = false;
 	bool interact_found = false;
 	bool skill_found = false;
@@ -138,6 +142,7 @@ void MenuTouchControls::logic() {
 			move_thumb = inpt->touchFingerPosition(i);
 			move_found = true;
 		}
+		if (id == hotbar_finger_id) hotbar_found = true;
 		if (id == attack_finger_id) attack_found = true;
 		if (id == interact_finger_id) interact_found = true;
 		if (id == skill_finger_id) skill_found = true;
@@ -146,20 +151,39 @@ void MenuTouchControls::logic() {
 		move_finger_id = -1;
 		move_active = false;
 	}
+	if (!hotbar_found) hotbar_finger_id = -1;
 	if (!attack_found) attack_finger_id = -1;
 	if (!interact_found) interact_finger_id = -1;
 	if (!skill_found) skill_finger_id = -1;
 
-	// Claim new contacts only in their starting areas. A movement thumb
-	// that drifts onto a right-hand button must never fire an attack.
+	// Keep the floating movement ring clear of the original bottom potion bar.
+	const int hotbar_top = (menu && menu->act && menu->act->slots_count)
+		? menu->act->getSlotPos(0).y : settings->view_h - 70;
+	const int move_bottom = std::max(settings->view_h * 40 / 100,
+		hotbar_top - move_radius - radius_padding / 2);
+	// New touches on existing quickslots take precedence over the joystick.
 	for (size_t i = 0; i < inpt->touchFingerCount(); ++i) {
 		const long int id = inpt->touchFingerId(i);
-		if (id == move_finger_id || id == attack_finger_id || id == interact_finger_id || id == skill_finger_id) continue;
+		if (id == move_finger_id || id == hotbar_finger_id || id == attack_finger_id || id == interact_finger_id || id == skill_finger_id) continue;
 		Point pos = inpt->touchFingerPosition(i);
 		FPoint finger(static_cast<float>(pos.x), static_cast<float>(pos.y));
 		FPoint action(static_cast<float>(main1_center.x), static_cast<float>(main1_center.y));
 		FPoint attack(static_cast<float>(main2_center.x), static_cast<float>(main2_center.y));
 		FPoint skill(static_cast<float>(skill_center.x), static_cast<float>(skill_center.y));
+		// One tap uses the original assigned quickbar power, including potions,
+		// even when a different SDL finger keeps the virtual stick moving.
+		if (menu && menu->act && !menu->menus_open && menu->act->isWithinSlots(pos)) {
+			if (hotbar_finger_id == -1) {
+				WidgetSlot* quickslot = menu->act->getSlotFromPosition(pos);
+				if (quickslot) {
+					hotbar_finger_id = id;
+					menu->act->touch_slot = quickslot;
+					inpt->pressing[Input::MAIN1] = false;
+					inpt->lock[Input::MAIN1] = true;
+				}
+			}
+			continue;
+		}
 		if (skill_finger_id == -1 && Utils::isWithinRadius(skill, static_cast<float>(skill_radius), finger)) {
 			skill_finger_id = id;
 		}
@@ -175,7 +199,7 @@ void MenuTouchControls::logic() {
 			interact_pulse = true;
 		}
 		else if (move_finger_id == -1 && pos.x < settings->view_w * 42 / 100 &&
-				 pos.y > settings->view_h * 30 / 100) {
+				 pos.y > settings->view_h * 30 / 100 && pos.y < move_bottom) {
 			move_finger_id = id;
 			move_active = true;
 			move_center = pos; // Floating thumbstick originates at touch-down.
@@ -194,7 +218,7 @@ void MenuTouchControls::logic() {
 			move_center.y += static_cast<int>(overflow * dy / dist);
 			// Keep the floating base in the left/bottom gameplay region.
 			move_center.x = std::max(move_radius, std::min(settings->view_w * 44 / 100, move_center.x));
-			move_center.y = std::max(move_radius, std::min(settings->view_h - move_radius, move_center.y));
+			move_center.y = std::max(move_radius, std::min(move_bottom, move_center.y));
 		}
 		if (move_thumb.x < move_center.x - move_deadzone) inpt->pressing[Input::LEFT] = true;
 		if (move_thumb.x > move_center.x + move_deadzone) inpt->pressing[Input::RIGHT] = true;
@@ -202,27 +226,29 @@ void MenuTouchControls::logic() {
 		if (move_thumb.y > move_center.y + move_deadzone) inpt->pressing[Input::DOWN] = true;
 	}
 
-	// Movement and action-zone taps must not also activate MAIN1/slot 10.
-	// Only the dedicated skill ring may activate native MAIN1 / slot 10.
-	// The skill can be cast while the left thumb is still moving.
-	if (skill_finger_id != -1) {
+	// The original Empyrean Campaign uses slot 10 (MAIN1) for basic
+	// attack, and slot 11 (MAIN2) for the class skill.
+	if (attack_finger_id != -1) {
 		inpt->pressing[Input::MAIN1] = true;
 		inpt->lock[Input::MAIN1] = false;
 	}
-	else if (move_active || attack_finger_id != -1 || interact_finger_id != -1) {
+	else if (move_active || hotbar_finger_id != -1 ||
+			skill_finger_id != -1 || interact_finger_id != -1) {
+		// SDL synthesizes MAIN1 for every finger; suppress it for other zones.
+		inpt->pressing[Input::MAIN1] = false;
 		inpt->lock[Input::MAIN1] = true;
 	}
-	// Only the attack ring holds native slot 11, independent of the stick.
-	if (attack_finger_id != -1) {
+	if (skill_finger_id != -1) {
 		inpt->pressing[Input::MAIN2] = true;
 		inpt->lock[Input::MAIN2] = false;
 	}
+
 }
 
 bool MenuTouchControls::checkAllowMain1() {
 	// Unlike the global synthetic mouse pointer, this is finger-specific.
-	// Slot 10 is the player's assignable skill, while slot 11 attacks.
-	return skill_finger_id != -1;
+	// Attack is MAIN1 (slot 10) and Skill is MAIN2 (slot 11).
+	return attack_finger_id != -1;
 }
 
 void MenuTouchControls::renderInput(const Point& center, const int radius, const Color& color) {

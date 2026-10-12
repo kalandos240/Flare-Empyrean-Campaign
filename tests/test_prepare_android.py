@@ -98,8 +98,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn(PACKAGE_ID, (app / "build.gradle").read_text())
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
             self.assertIn("minSdk 26", (app / "build.gradle").read_text())
-            self.assertIn("versionCode 2", (app / "build.gradle").read_text())
-            self.assertIn("versionName '0.2.0'", (app / "build.gradle").read_text())
+            self.assertIn("versionCode 3", (app / "build.gradle").read_text())
+            self.assertIn("versionName '0.2.1'", (app / "build.gradle").read_text())
             self.assertIn('label_version->setText("Android 8.0+")',
                           (engine / "src/GameStateTitle.cpp").read_text())
             cutscene_source = (engine / "src/GameStateCutscene.cpp").read_text()
@@ -382,9 +382,9 @@ class PrepareAndroidTests(unittest.TestCase):
         instrument = (root / "scripts/emulator_instrument.py").read_text()
         hud = (root / "scripts/emulator_hud_test.sh").read_text()
         self.assertIn("attack ring claimed real SDL finger", instrument)
-        self.assertIn("slot11 input fired", instrument)
+        self.assertIn("slot10 input fired", instrument)
         self.assertIn("attack ring claimed real SDL finger", hud)
-        self.assertIn("slot11 input fired", hud)
+        self.assertIn("slot10 input fired", hud)
 
     def test_emulator_intro_progress_has_native_state_markers(self):
         root = Path(__file__).resolve().parents[1]

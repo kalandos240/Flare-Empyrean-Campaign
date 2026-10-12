@@ -95,7 +95,7 @@ if (( inventory_closed == 0 )); then
   exit 1
 fi
 
-# The far-right touch ring is Flare's MAIN2 action button (slot 11).
+# The far-right touch ring is Flare's MAIN1 action button (slot 10).
 # An actual normal power being put onto the action queue is verified in C++.
 attack_x=$((width * 925 / 1000))
 attack_y=$((height * 663 / 1000))
@@ -114,7 +114,7 @@ for attempt in $(seq 1 13); do
   if grep -q 'FlarePort QA: attack ring claimed real SDL finger' "$LOG"; then
     attack_claimed=1
   fi
-  if grep -q 'FlarePort QA: slot11 input fired' "$LOG"; then
+  if grep -q 'FlarePort QA: slot10 input fired' "$LOG"; then
     attack_input=1
   fi
   if grep -q 'FlarePort QA: touch combat action queued for slot 11' "$LOG"; then
@@ -167,7 +167,7 @@ if (( interact_pressed == 0 )); then
   exit 1
 fi
 
-# Skill is a separate third ring above Use, assigned to native MAIN1 (slot 10).
+# Skill is a separate third ring above Use, assigned to native MAIN2 (slot 11).
 # The ring center is derived from the native Flare Android geometry.
 skill_x=$((width * 730 / 1000))
 skill_y=$((height * 429 / 1000))
@@ -178,16 +178,16 @@ skill_claimed=0
 for attempt in $(seq 1 13); do
   sleep 2
   adb logcat -d -v time > "$LOG"
-  if grep -q 'FlarePort QA: skill ring accepted MAIN1 slot 10' "$LOG"; then
+  if grep -q 'FlarePort QA: skill ring accepted MAIN2 slot 11' "$LOG"; then
     skill_claimed=1
     break
   fi
 done
 if (( skill_claimed == 0 )); then
-  echo 'Dedicated Skill ring failed to select native MAIN1.' >&2
+  echo 'Dedicated Skill ring failed to select native MAIN2.' >&2
   grep -E 'FlarePort QA|SDL/APP|FATAL EXCEPTION' "$LOG" | tail -75 >&2 || true
   exit 1
 fi
 adb shell pidof "$PACKAGE" >/dev/null
-echo 'PASSED: inventory opens/closes; Attack reaches MAIN2, Use=ACCEPT, Skill=MAIN1.'
+echo 'PASSED: inventory opens/closes; Attack reaches MAIN1, Use=ACCEPT, Skill=MAIN2.'
 echo 'This validates native ability queueing, NOT hitting an actual enemy.'
