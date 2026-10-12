@@ -70,12 +70,12 @@ Android version and reproducible issues in a GitHub issue.
 - [ ] Confirm saves are under `userdata/saves` and options are under
       `config/flare-game`. These directories must not be overwritten by updating assets.
 
-## Touch-control regression status (2026-10-12)
+## Touch-control verification (2026-10-12)
 
-- [Joystick smoke #38179949594](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38179949594) did **not** reach the movement assertions: the emulator stopped during the original introductory cutscene, before loading a saved character. Do not treat this failure as proof of a broken joystick.
-- The current emulator diagnostics instrument the **real** Next-button click handler, count accepted cutscene taps, and preserve `flare-intro-progress.png` / `flare-intro-stuck.png` screenshots if it stalls.
-- The dedicated movement scenario drags the original left-side virtual joystick after loading the saved hero and requires both native directional input and a measured change in `Avatar::stats.pos`. A passing saved-game load alone does **not** validate movement.
-- The RuStore production build has a CI guard against including the emulator-only exported `QaReceiver`. This test bridge is **never intended for distribution**.
+- [Successful original-joystick test #38235332631](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38235332631) confirms a full touch-only character creation and save/load cycle, followed by a 2.6-second drag of the **original left virtual movement ring**. Native `MenuTouchControls` received directional input and `Avatar::stats.pos` changed by **(+0.35, −0.35) map units**. The original map and full HUD were captured in `flare-after-joystick.png`.
+- The earlier failed [joystick smoke #38179949594](https://github.com/kalandos240/Flare-Empyrean-Campaign/actions/runs/38179949594) stopped at the intro cutscene *before* testing movement. New diagnostic Next-button instrumentation and retries produced the successful run above.
+- The next emulator scenario opens/closes the native inventory with the HUD button, compares screenshots, and tests primary melee/power queueing via the right virtual button. It does **not** constitute a real enemy-combat test until one is separately implemented and verified.
+- The RuStore production build includes a CI guard against the emulator-only exported `QaReceiver`; this test bridge is **not distributed**.
 
 ## Gameplay and touch
 
