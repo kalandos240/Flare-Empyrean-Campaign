@@ -69,9 +69,14 @@ availability, and share-alike obligations. Link to this build recipe and its
 upstream sources in the RuStore description.
 
 RuStore accepts signed **APK and AAB** packages, but requires a unique application
-ID and signing credentials. This project deliberately does **not** store signing
-keys or publish automatically. A signed release, real-device QA, accessibility,
-store screenshots, privacy documentation and a complete license audit remain to do.
+ID and signing credentials. This repository never stores signing keys in source
+control. The separate **publisher-signed RuStore APK** workflow step is enabled
+only when both `FLARE_KEYSTORE_BASE64` and `FLARE_KEYSTORE_PASSWORD` are provided
+as GitHub Actions Secrets. See [secure signing instructions](docs/RELEASE_SIGNING_RU.md).
+The output is `flare-empyrean-0.2.2-rustore-signed.apk` in a distinct prerelease;
+**do not submit `flare-empyrean-0.2.2-debug.apk` to RuStore.** A signed release,
+real-device QA, accessibility, store screenshots, privacy documentation and a
+complete license audit remain to do.
 
 ## Limitations / next steps
 
@@ -79,6 +84,6 @@ store screenshots, privacy documentation and a complete license audit remain to 
 - Validate installation times and APK size on physical devices.
 - Check Android 15 edge-to-edge layout, display cutouts, touch target sizes and input.
 - Test save persistence, lifecycle pause/resume and crash recovery.
-- Implement secure release signing and RuStore submission metadata.
+- Confirm publisher certificate fingerprint and RuStore submission metadata.
 
 This independent port is not affiliated with the original Flare developers.
