@@ -1,0 +1,217 @@
+name: Android RuStore port
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - port/rustore-android-foundation
+    paths:
+      - '.github/workflows/android.yml'
+      - 'scripts/prepare_android.py'
+      - 'tests/test_prepare_android.py'
+      - 'android/LaunchActivity.java'
+      - 'android/CampaignPathValidator.java'
+      - 'android/native/**'
+      - 'tests/java/**'
+      - 'README.md'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flare-rustore-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout port scripts
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test packaging logic
+        run: python -m unittest discover -s tests -v
+
+      - name: Install JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Check Java campaign archive paths
+        run: |
+          mkdir -p "$RUNNER_TEMP/flare-java-tests"
+          javac -d "$RUNNER_TEMP/flare-java-tests" android/CampaignPathValidator.java tests/java/CampaignPathValidatorTest.java
+          java -cp "$RUNNER_TEMP/flare-java-tests" org.flare.app.CampaignPathValidatorTest
+
+      - name: Install Android NDK and platform
+        run: |
+          # ubuntu-latest already contains the Android command-line tools.
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$PATH"
+          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned upstream Flare engine and campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          git init upstream/flare-engine
+          git -C upstream/flare-engine remote add origin https://github.com/flareteam/flare-engine.git
+          git -C upstream/flare-engine fetch --depth 1 origin 1969baeb89ebf94cf22e2bc2ed4e3d8413714d4f
+          git -C upstream/flare-engine checkout --detach FETCH_HEAD
+          git -C upstream/flare-engine submodule update --init --recursive
+
+          git init upstream/flare-game
+          git -C upstream/flare-game remote add origin https://github.com/flareteam/flare-game.git
+          git -C upstream/flare-game fetch --depth 1 origin af6eee6d339ac98011864bfe89da837fe7769c28
+          git -C upstream/flare-game checkout --detach FETCH_HEAD
+
+      - name: Prepare Android sources and bundled Empyrean Campaign
+        run: |
+          python scripts/prepare_android.py \
+            --engine upstream/flare-engine \
+            --game upstream/flare-game
+
+      - name: Build unsigned release bundle and debug APK
+        working-directory: upstream/flare-engine/flare-android-project
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.daemon=false'
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug :app:bundleRelease --stacktrace
+
+      - name: Inspect APK, AAB and packaged campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP='upstream/flare-engine/flare-android-project/app'
+          APK="$APP/build/outputs/apk/debug/app-debug.apk"
+          AAB="$APP/build/outputs/bundle/release/app-release.aab"
+          META="$APP/src/main/assets/campaign-info.properties"
+          echo 'APK/AAB sizes (bytes):'
+          stat -c '%n %s' "$APK" "$AAB"
+          echo 'Campaign manifest:'
+          cat "$META"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$AAPT" dump badging "$APK" | grep -E '^(package:|sdkVersion:|targetSdkVersion:|native-code:|application-label:)'
+          "$AAPT" dump badging "$APK" | grep -q "name='com.kalandos240.flareempyrean'"
+          "$AAPT" dump badging "$APK" | grep -q 'arm64-v8a'
+          "$AAPT" dump badging "$APK" | grep -q "sdkVersion:'26'"
+          # The exported emulator QA receiver has app-private file access and
+          # must never ship in a store build. Fail closed if it leaks into APK.
+          if "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -Fq 'org.flare.app.QaReceiver'; then
+            echo 'Security error: emulator-only QA receiver is exported in store APK' >&2
+            exit 1
+          fi
+          if "$AAPT" dump permissions "$APK" | grep -Eq 'MANAGE_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE'; then
+            echo 'Broad filesystem permissions found in APK' >&2
+            exit 1
+          fi
+          unzip -Z1 "$APK" > "$RUNNER_TEMP/flare-apk-entries.txt"
+          unzip -Z1 "$AAB" > "$RUNNER_TEMP/flare-aab-entries.txt"
+          if grep -Eq '^lib/(x86|x86_64)/' "$RUNNER_TEMP/flare-apk-entries.txt"; then
+            echo 'Unexpected x86 native libraries in store APK' >&2
+            exit 1
+          fi
+          grep -q '^assets/campaign.zip$' "$RUNNER_TEMP/flare-apk-entries.txt"
+          grep -q '^assets/campaign-info.properties$' "$RUNNER_TEMP/flare-apk-entries.txt"
+          grep -q '^base/assets/campaign.zip$' "$RUNNER_TEMP/flare-aab-entries.txt"
+
+      - name: Publish direct-install Android 0.2.2 APK
+        if: github.ref == 'refs/heads/port/rustore-android-foundation'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="android-v0.2.2-debug"
+          APK="upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk"
+          cp "$APK" "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk"
+          sha256sum "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk" > "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk.sha256"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease \
+              --title "Flare: Empyrean Campaign 0.2.2 — Android APK" \
+              --notes "Android 8.0+ ARM debug APK. Touch fixes: separate joystick/quickslot fingers, correctly assigned Attack (MAIN1) and Skill (MAIN2), a tighter three-button group positioned above the potion bar; touch controls pause while game menus are open. Developer/debug signature only, not a signed RuStore package. This is an ad-free build."
+          fi
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" \
+              "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk" \
+              "$RUNNER_TEMP/flare-empyrean-0.2.2-debug.apk.sha256" \
+              --repo "$GITHUB_REPOSITORY" --clobber; then
+              echo "Direct APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/flare-empyrean-0.2.2-debug.apk"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Build and publish publisher-signed RuStore APK when secrets are available
+        if: github.ref == 'refs/heads/port/rustore-android-foundation'
+        shell: bash
+        env:
+          FLARE_KEYSTORE_BASE64: ${{ secrets.FLARE_KEYSTORE_BASE64 }}
+          FLARE_KEYSTORE_PASSWORD: ${{ secrets.FLARE_KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The previous debug and AAB builds never require publisher secrets.
+          if [[ -z "$FLARE_KEYSTORE_BASE64" || -z "$FLARE_KEYSTORE_PASSWORD" ]]; then
+            echo 'Publisher signing secrets are not configured; skipping signed APK.'
+            exit 0
+          fi
+          export FLARE_RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/flare-release.jks"
+          export FLARE_RELEASE_KEYSTORE_PASSWORD="$FLARE_KEYSTORE_PASSWORD"
+          umask 077
+          printf '%s' "$FLARE_KEYSTORE_BASE64" | base64 --decode > "$FLARE_RELEASE_KEYSTORE_PATH"
+          unset FLARE_KEYSTORE_BASE64 FLARE_KEYSTORE_PASSWORD
+          test -s "$FLARE_RELEASE_KEYSTORE_PATH"
+          trap 'rm -f "$FLARE_RELEASE_KEYSTORE_PATH"' EXIT
+          cd upstream/flare-engine/flare-android-project
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleRelease
+          cd ../..
+          APK='flare-engine/flare-android-project/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "name='com.kalandos240.flareempyrean'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "versionCode='4'"
+          unzip -Z1 "$APK" | grep -Fqx 'assets/campaign.zip'
+          NAME='flare-empyrean-0.2.2-rustore-signed.apk'
+          cp "$APK" "$RUNNER_TEMP/$NAME"
+          (cd "$RUNNER_TEMP" && sha256sum "$NAME" > "$NAME.sha256")
+          TAG='android-v0.2.2-rustore-signed'
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease \
+              --title 'Flare: Empyrean Campaign 0.2.2 — publisher-signed RuStore APK' \
+              --notes 'Android 8.0+ publisher-signed APK (versionCode 4). Uses publisher keystore from GitHub Actions Secrets. No advertising SDKs are enabled. Confirm RuStore review and publisher signing certificate before publication.'
+          fi
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" "$RUNNER_TEMP/$NAME" "$RUNNER_TEMP/$NAME.sha256" \
+              --repo "$GITHUB_REPOSITORY" --clobber; then
+              echo "Signed APK published to https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Upload debug install and unsigned AAB
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flare-empyrean-android-unsigned
+          path: |
+            upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/*.apk
+            upstream/flare-engine/flare-android-project/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
