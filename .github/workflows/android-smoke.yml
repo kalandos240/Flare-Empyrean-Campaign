@@ -1,0 +1,151 @@
+name: Android emulator launch smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - port/rustore-android-foundation
+    paths:
+      - '.github/workflows/android-smoke.yml'
+      - 'scripts/prepare_android.py'
+      - 'scripts/rustore_icon.py'
+      - 'tests/test_prepare_android.py'
+      - 'scripts/emulator_smoke.sh'
+      - 'scripts/emulator_load_test.sh'
+      - 'scripts/emulator_movement_test.sh'
+      - 'scripts/emulator_menus_test.sh'
+      - 'scripts/emulator_hud_test.sh'
+      - 'scripts/emulator_back_test.sh'
+      - 'scripts/emulator_death_test.sh'
+      - 'scripts/emulator_instrument.py'
+      - 'scripts/assert_screen_change.py'
+      - 'android/**'
+      - 'tests/java/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flare-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        api_level: [26, 30]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image dependencies and run packaging tests
+        run: |
+          python -m pip install 'Pillow>=10,<13'
+          python -m unittest discover -s tests -v
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Check Java campaign archive paths
+        run: |
+          mkdir -p "$RUNNER_TEMP/flare-java-tests"
+          javac -d "$RUNNER_TEMP/flare-java-tests" android/CampaignPathValidator.java tests/java/CampaignPathValidatorTest.java
+          java -cp "$RUNNER_TEMP/flare-java-tests" org.flare.app.CampaignPathValidatorTest
+
+      - name: Install NDK
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$PATH"
+          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned upstream engine and game
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          git init upstream/flare-engine
+          git -C upstream/flare-engine remote add origin https://github.com/flareteam/flare-engine.git
+          git -C upstream/flare-engine fetch --depth 1 origin 1969baeb89ebf94cf22e2bc2ed4e3d8413714d4f
+          git -C upstream/flare-engine checkout --detach FETCH_HEAD
+          git -C upstream/flare-engine submodule update --init --recursive
+
+          git init upstream/flare-game
+          git -C upstream/flare-game remote add origin https://github.com/flareteam/flare-game.git
+          git -C upstream/flare-game fetch --depth 1 origin af6eee6d339ac98011864bfe89da837fe7769c28
+          git -C upstream/flare-game checkout --detach FETCH_HEAD
+
+      - name: Prepare x86_64 smoke-only APK
+        run: |
+          python scripts/prepare_android.py --engine upstream/flare-engine --game upstream/flare-game --abis x86_64
+
+      - name: Enable emulator-only stage markers
+        run: python scripts/emulator_instrument.py --engine upstream/flare-engine
+
+      - name: Build debug emulator APK
+        working-directory: upstream/flare-engine/flare-android-project
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Boot Android API ${{ matrix.api_level }} emulator and verify native game
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api_level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -partition-size 8192
+          disable-animations: true
+          # android-emulator-runner executes script through /bin/sh; keep this
+          # a single shell command (multi-line if blocks are split by the runner).
+          script: FLARE_SMOKE_CREATOR_ONLY=${{ matrix.api_level == 26 && '1' || '0' }} bash scripts/emulator_smoke.sh upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload emulator screenshot and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flare-emulator-diagnostics-api${{ matrix.api_level }}
+          path: |
+            ${{ runner.temp }}/flare-native-start.png
+            ${{ runner.temp }}/flare-title-not-ready.png
+            ${{ runner.temp }}/flare-play-attempt-*.png
+            ${{ runner.temp }}/flare-character-creation.png
+            ${{ runner.temp }}/flare-intro.png
+            ${{ runner.temp }}/flare-intro-progress.png
+            ${{ runner.temp }}/flare-intro-stuck.png
+            ${{ runner.temp }}/flare-gameplay.png
+            ${{ runner.temp }}/flare-after-play.png
+            ${{ runner.temp }}/flare-relaunch.png
+            ${{ runner.temp }}/flare-load-menu.png
+            ${{ runner.temp }}/flare-loaded-gameplay.png
+            ${{ runner.temp }}/flare-load-test.log
+            ${{ runner.temp }}/flare-after-joystick.png
+            ${{ runner.temp }}/flare-joystick-test.log
+            ${{ runner.temp }}/flare-inventory.png
+            ${{ runner.temp }}/flare-inventory-closed.png
+            ${{ runner.temp }}/flare-combat-touch.png
+            ${{ runner.temp }}/flare-hud-test.log
+            ${{ runner.temp }}/flare-menus-test.log
+            ${{ runner.temp }}/flare-menu-*.png
+            ${{ runner.temp }}/flare-back-pause.png
+            ${{ runner.temp }}/flare-back-resume.png
+            ${{ runner.temp }}/flare-back-test.log
+            ${{ runner.temp }}/flare-death-screen.png
+            ${{ runner.temp }}/flare-death-respawn.png
+            ${{ runner.temp }}/flare-death-test.log
+            ${{ runner.temp }}/flare-android-smoke.log
+          if-no-files-found: warn
+          retention-days: 7
