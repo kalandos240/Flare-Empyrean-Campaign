@@ -13,6 +13,7 @@ on:
       - 'android/native/**'
       - 'tests/java/**'
       - 'scripts/prepare_android.py'
+      - 'scripts/rustore_icon.py'
       - 'tests/test_prepare_android.py'
 
 permissions:
@@ -36,6 +37,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Install image dependencies
+        run: python -m pip install 'Pillow>=10,<13'
 
       - name: Test ad-free, VK, Yandex and combined generator variants
         run: python -m unittest discover -s tests -v
