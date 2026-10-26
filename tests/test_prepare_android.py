@@ -4,6 +4,8 @@ from xml.etree import ElementTree as ET
 from pathlib import Path
 from zipfile import ZipFile
 
+from PIL import Image
+
 from scripts.prepare_android import (
     CONTENT_VERSION,
     MANIFEST,
@@ -40,6 +42,12 @@ class PrepareAndroidTests(unittest.TestCase):
             (jni / "SDL2_mixer").mkdir(parents=True)
             (app / "src/main/res/values").mkdir(parents=True)
             (engine / "src").mkdir(parents=True)
+            (engine / "distribution").mkdir(parents=True)
+            # The pinned upstream checkout provides this official transparent
+            # Flare launcher logo; fake it for fixture-only packaging tests.
+            Image.new("RGBA", (256, 256), (255, 150, 0, 120)).save(
+                engine / "distribution/flare_logo_icon.png"
+            )
             (engine / "mods/default").mkdir(parents=True)
             (game / "mods/fantasycore").mkdir(parents=True)
             (game / "mods/empyrean_campaign").mkdir(parents=True)
@@ -96,6 +104,21 @@ class PrepareAndroidTests(unittest.TestCase):
 
             project = prepare(engine, game)
             self.assertEqual(project, engine / "flare-android-project")
+            catalog_icon = engine / "flare-android-project/rustore-icon-512.png"
+            with Image.open(catalog_icon) as store_icon:
+                self.assertEqual(store_icon.size, (512, 512))
+                self.assertEqual(store_icon.mode, "RGB")
+                for density, size in (("mdpi", 48), ("hdpi", 72),
+                                      ("xhdpi", 96), ("xxhdpi", 144),
+                                      ("xxxhdpi", 192)):
+                    installed_icon = app / f"src/main/res/drawable-{density}/ic_launcher.png"
+                    with Image.open(installed_icon) as launcher:
+                        self.assertEqual(launcher.size, (size, size))
+                        self.assertEqual(launcher.mode, "RGB")
+                        self.assertEqual(
+                            launcher.tobytes(),
+                            store_icon.resize((size, size), Image.Resampling.LANCZOS).tobytes(),
+                        )
             self.assertIn(PACKAGE_ID, (app / "build.gradle").read_text())
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
             self.assertIn("minSdk 26", (app / "build.gradle").read_text())
