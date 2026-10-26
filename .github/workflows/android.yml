@@ -9,6 +9,7 @@ on:
     paths:
       - '.github/workflows/android.yml'
       - 'scripts/prepare_android.py'
+      - 'scripts/rustore_icon.py'
       - 'tests/test_prepare_android.py'
       - 'android/LaunchActivity.java'
       - 'android/CampaignPathValidator.java'
@@ -35,6 +36,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Install icon generation dependency
+        run: python -m pip install 'Pillow>=10,<13'
 
       - name: Test packaging logic
         run: python -m unittest discover -s tests -v
@@ -80,6 +84,22 @@ jobs:
             --engine upstream/flare-engine \
             --game upstream/flare-game
 
+      - name: Verify launcher and storefront icon assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          p = Path('upstream/flare-engine/flare-android-project')
+          with Image.open(p / 'rustore-icon-512.png') as art:
+              assert art.mode == 'RGB' and art.size == (512, 512)
+              assert art.getpixel((0, 0)) == (31, 31, 35)
+              for density, size in [('mdpi', 48), ('hdpi', 72), ('xhdpi', 96),
+                                    ('xxhdpi', 144), ('xxxhdpi', 192)]:
+                  with Image.open(p / f'app/src/main/res/drawable-{density}/ic_launcher.png') as icon:
+                      assert icon.mode == 'RGB' and icon.size == (size, size)
+                      assert icon.tobytes() == art.resize((size, size), Image.Resampling.LANCZOS).tobytes()
+          PY
+
       - name: Build unsigned release bundle and debug APK
         working-directory: upstream/flare-engine/flare-android-project
         env:
@@ -115,6 +135,7 @@ jobs:
             echo 'Broad filesystem permissions found in APK' >&2
             exit 1
           fi
+          "$AAPT" dump badging "$APK" | grep -q 'application-icon'
           unzip -Z1 "$APK" > "$RUNNER_TEMP/flare-apk-entries.txt"
           unzip -Z1 "$AAB" > "$RUNNER_TEMP/flare-aab-entries.txt"
           if grep -Eq '^lib/(x86|x86_64)/' "$RUNNER_TEMP/flare-apk-entries.txt"; then
@@ -195,8 +216,9 @@ jobs:
               --title 'Flare: Empyrean Campaign 0.2.2 — publisher-signed RuStore APK' \
               --notes 'Android 8.0+ publisher-signed APK (versionCode 4). Uses publisher keystore from GitHub Actions Secrets. No advertising SDKs are enabled. Confirm RuStore review and publisher signing certificate before publication.'
           fi
+          ICON='flare-engine/flare-android-project/rustore-icon-512.png'
           for attempt in 1 2 3; do
-            if gh release upload "$TAG" "$RUNNER_TEMP/$NAME" "$RUNNER_TEMP/$NAME.sha256" \
+            if gh release upload "$TAG" "$RUNNER_TEMP/$NAME" "$RUNNER_TEMP/$NAME.sha256" "$ICON" \
               --repo "$GITHUB_REPOSITORY" --clobber; then
               echo "Signed APK published to https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
               exit 0
@@ -204,6 +226,14 @@ jobs:
             sleep 10
           done
           exit 1
+
+      - name: Upload RuStore 512px icon
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: flare-rustore-icon-512
+          path: upstream/flare-engine/flare-android-project/rustore-icon-512.png
+          if-no-files-found: error
 
       - name: Upload debug install and unsigned AAB
         uses: actions/upload-artifact@v4
