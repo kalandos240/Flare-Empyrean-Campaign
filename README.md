@@ -56,6 +56,17 @@ The assets installer writes only `mods/` and `licenses/`. The engine writes
 `config/` and `userdata/saves/` in Android's per-app external-files directory.
 Android may delete app data when uninstalling the game, so preserve saves before removal.
 
+## RuStore / Android icon consistency
+
+The Android launcher icon and the 512x512 RuStore catalog icon are now generated
+from the **same official Flare flame**. The former blurred title-screen/banner
+art must not be uploaded as the store icon. After a successful build, upload
+`rustore-icon-512.png` together with its matching **publisher-signed APK**.
+The build publishes the catalog PNG as a separate workflow artifact and a signed
+release asset when signing is available.
+
+See [RuStore icon fix and resubmission steps](docs/RUSTORE_ICON_RU.md).
+
 ## Licensing and RuStore publishing
 
 The original engine is licensed under **GPL-3.0-or-later**. The game art and data
