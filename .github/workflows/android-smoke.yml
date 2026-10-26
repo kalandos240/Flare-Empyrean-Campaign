@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/android-smoke.yml'
       - 'scripts/prepare_android.py'
+      - 'scripts/rustore_icon.py'
       - 'tests/test_prepare_android.py'
       - 'scripts/emulator_smoke.sh'
       - 'scripts/emulator_load_test.sh'
@@ -43,10 +44,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run packaging tests and install screenshot tools
+      - name: Install image dependencies and run packaging tests
         run: |
-          python -m unittest discover -s tests -v
           python -m pip install 'Pillow>=10,<13'
+          python -m unittest discover -s tests -v
 
       - uses: actions/setup-java@v4
         with:
