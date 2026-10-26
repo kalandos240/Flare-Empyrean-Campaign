@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
+import sys
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
@@ -597,6 +599,12 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     application_mk.write_text(application_config, encoding="utf-8")
 
     pack_campaign(engine, game, app / "src/main/assets/campaign.zip")
+    # Replace every upstream launcher density with the exact same artwork as
+    # the full-bleed 512px RuStore catalog icon. Never use title-screen art.
+    subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("rustore_icon.py")), "--engine", str(engine)],
+        check=True,
+    )
     return project
 
 def main() -> None:
