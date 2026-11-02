@@ -1,0 +1,62 @@
+name: Publish single Flare 0.2.0 debug APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - port/rustore-android-foundation
+    paths:
+      - '.github/workflows/apk-direct-download.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-installable-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Download the two verified chunks of the already-built APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/part-00" "$RUNNER_TEMP/part-01" "$RUNNER_TEMP/delivery"
+          gh run download 38313224327 --repo "$GITHUB_REPOSITORY" --name flare-0.2.0-apk-part-00 --dir "$RUNNER_TEMP/part-00"
+          gh run download 38313224327 --repo "$GITHUB_REPOSITORY" --name flare-0.2.0-apk-part-01 --dir "$RUNNER_TEMP/part-01"
+          cat "$RUNNER_TEMP/part-00/flare-empyrean-0.2.0-debug.apk.part.00" \
+              "$RUNNER_TEMP/part-01/flare-empyrean-0.2.0-debug.apk.part.01" \
+              > "$RUNNER_TEMP/delivery/flare-empyrean-0.2.0-debug.apk"
+          cd "$RUNNER_TEMP/delivery"
+          echo '3e53eeddfe8af15c79ce03dfa0bd4490b85731cf3172c5fd994e0ca9f043de6c  flare-empyrean-0.2.0-debug.apk' | sha256sum --check --status
+          test "$(stat -c '%s' flare-empyrean-0.2.0-debug.apk)" -eq 617934161
+          unzip -tq flare-empyrean-0.2.0-debug.apk | tail -1
+          sha256sum flare-empyrean-0.2.0-debug.apk > flare-empyrean-0.2.0-debug.apk.sha256
+          echo "Verified the complete 617934161-byte APK."
+
+      - name: Publish complete APK as a GitHub prerelease asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=android-v0.2.0-debug
+          APK="$RUNNER_TEMP/delivery/flare-empyrean-0.2.0-debug.apk"
+          HASH="$RUNNER_TEMP/delivery/flare-empyrean-0.2.0-debug.apk.sha256"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease \
+              --title "Flare: Empyrean Campaign 0.2.0 — Android APK (debug)" \
+              --notes "Android 8.0+ armv7/arm64 installer; debug build for personal device testing. Not a signed RuStore production release. The optional VK and Yandex advertising SDKs are not included in this APK. Original Flare engine and Empyrean Campaign copyright and open-source license terms apply."
+          fi
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" "$APK" "$HASH" --repo "$GITHUB_REPOSITORY" --clobber; then
+              echo "Ready: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/flare-empyrean-0.2.0-debug.apk"
+              exit 0
+            fi
+            echo "Asset upload failed on attempt $attempt" >&2
+            sleep 10
+          done
+          exit 1

@@ -1,0 +1,124 @@
+name: Optional VK and Yandex Ads compile
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - port/rustore-android-foundation
+    paths:
+      - '.github/workflows/android-vk-ads-compile.yml'
+      - 'android/VkAdsBridge.java'
+      - 'android/YandexAdsBridge.java'
+      - 'android/CampaignPathValidator.java'
+      - 'android/native/**'
+      - 'tests/java/**'
+      - 'scripts/prepare_android.py'
+      - 'scripts/rustore_icon.py'
+      - 'tests/test_prepare_android.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flare-optional-ads-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  optional-sdk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        network: [vk, yandex, both]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image dependencies
+        run: python -m pip install 'Pillow>=10,<13'
+
+      - name: Test ad-free, VK, Yandex and combined generator variants
+        run: python -m unittest discover -s tests -v
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Check Java campaign archive paths
+        run: |
+          mkdir -p "$RUNNER_TEMP/flare-java-tests"
+          javac -d "$RUNNER_TEMP/flare-java-tests" android/CampaignPathValidator.java tests/java/CampaignPathValidatorTest.java
+          java -cp "$RUNNER_TEMP/flare-java-tests" org.flare.app.CampaignPathValidatorTest
+
+      - name: Install native build tools
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$PATH"
+          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Fetch pinned upstream Flare engine and campaign
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          git init upstream/flare-engine
+          git -C upstream/flare-engine remote add origin https://github.com/flareteam/flare-engine.git
+          git -C upstream/flare-engine fetch --depth 1 origin 1969baeb89ebf94cf22e2bc2ed4e3d8413714d4f
+          git -C upstream/flare-engine checkout --detach FETCH_HEAD
+          git -C upstream/flare-engine submodule update --init --recursive
+          git init upstream/flare-game
+          git -C upstream/flare-game remote add origin https://github.com/flareteam/flare-game.git
+          git -C upstream/flare-game fetch --depth 1 origin af6eee6d339ac98011864bfe89da837fe7769c28
+          git -C upstream/flare-game checkout --detach FETCH_HEAD
+
+      - name: Generate opt-in ad SDK source (compile-only dummy IDs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          extra=()
+          case "${{ matrix.network }}" in
+            vk)
+              extra=(--vk-interstitial-slot 1)
+              ;;
+            yandex)
+              extra=(--yandex-interstitial-unit R-M-CI-PLACEHOLDER)
+              ;;
+            both)
+              extra=(--vk-interstitial-slot 1 --yandex-interstitial-unit R-M-CI-PLACEHOLDER)
+              ;;
+          esac
+          python scripts/prepare_android.py \
+            --engine upstream/flare-engine --game upstream/flare-game \
+            --abis x86_64 "${extra[@]}"
+          test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/FLARE.java
+          grep -q 'onGameSessionEnded' upstream/flare-engine/src/GameStatePlay.cpp
+          if [[ "${{ matrix.network }}" != vk ]]; then
+            grep -q 'mobileads:8.5.0' upstream/flare-engine/flare-android-project/app/build.gradle
+            grep -q 'AUTOMATIC_SDK_INITIALIZATION' upstream/flare-engine/flare-android-project/app/src/main/AndroidManifest.xml
+            test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/YandexAdsBridge.java
+          fi
+          if [[ "${{ matrix.network }}" != yandex ]]; then
+            grep -q 'mytarget-sdk:5.52.5' upstream/flare-engine/flare-android-project/app/build.gradle
+            test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/VkAdsBridge.java
+          fi
+
+      - name: Compile Android native engine and opted-in ad SDK bridges
+        working-directory: upstream/flare-engine/flare-android-project
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.daemon=false'
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug --stacktrace
+
+      - name: Confirm permission and release safety
+        run: |
+          set -euo pipefail
+          APK=upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$APK" | grep -q 'android.permission.INTERNET'
+          echo 'Only compilation is verified: dummy IDs are not real ad units. Do NOT publish this APK.'
+          # The deliberately invalid-slot test APK is never uploaded.
