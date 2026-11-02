@@ -1,6 +1,5 @@
 package org.flare.app;
 
-import android.os.SystemClock;
 import android.util.Log;
 
 import com.my.target.ads.InterstitialAd;
@@ -14,19 +13,14 @@ import com.my.target.common.models.IAdLoadingError;
  * Requests remain disabled until an actual user-facing privacy/consent flow
  * calls setPrivacyReady(). No SDK object is created by the offline default build.
  *
- * The game never waits for an ad to load. Only a completed game session,
- * after a native save and return to the title, is eligible for interstitials.
+ * The game never waits for an ad to load. The Activity selects safe break
+ * events and enforces one shared 150-second cooldown for both networks.
  */
 final class VkAdsBridge {
     private static final String TAG = "FlareVKAds";
-    private static final long MIN_SESSION_AGE_MS = 3L * 60 * 1000;
-    private static final long MIN_BETWEEN_ADS_MS = 4L * 60 * 1000;
 
     private final FLARE activity;
     private final int slotId;
-    // The title screen and first-launch installation do not count as playtime.
-    private long sessionStartedAt = 0L;
-    private long lastShownAt = 0;
     private boolean privacyReady = false;
     private boolean loaded = false;
     private InterstitialAd pendingAd;
@@ -51,32 +45,20 @@ final class VkAdsBridge {
         }
     }
 
-    void onGameSessionStarted() {
-        sessionStartedAt = SystemClock.elapsedRealtime();
-    }
-
-    void onGameSessionEnded() {
-        // Consume each completed session exactly once, even without an ad.
-        long start = sessionStartedAt;
-        sessionStartedAt = 0L;
-        if (start == 0L || !privacyReady || slotId <= 0 || !loaded || pendingAd == null)
-            return;
-
-        long now = SystemClock.elapsedRealtime();
-        if (now - start < MIN_SESSION_AGE_MS ||
-                (lastShownAt > 0 && now - lastShownAt < MIN_BETWEEN_ADS_MS))
-            return;
+    /** Show only a preloaded ad; Activity decides whether this break is eligible. */
+    boolean showIfReady() {
+        if (!privacyReady || slotId <= 0 || !loaded || pendingAd == null) return false;
 
         InterstitialAd ad = pendingAd;
         pendingAd = null;
         loaded = false;
-        lastShownAt = now;
-
         try {
             ad.show();
+            return true;
         } catch (RuntimeException error) {
             Log.w(TAG, "Unable to show VK interstitial; continuing the game", error);
             loadNext();
+            return false;
         }
     }
 
@@ -110,7 +92,7 @@ final class VkAdsBridge {
 
                 @Override
                 public void onDisplay(InterstitialAd ad) {
-                    Log.i(TAG, "Interstitial displayed at completed-game break");
+                    Log.i(TAG, "Interstitial displayed at safe game break");
                 }
 
                 @Override

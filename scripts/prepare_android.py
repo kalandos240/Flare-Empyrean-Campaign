@@ -35,8 +35,8 @@ android {
         applicationId 'com.kalandos240.flareempyrean'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '0.2.2'
+        versionCode 5
+        versionName '0.2.3'
     }
 
     sourceSets {
@@ -401,7 +401,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             )
         activity_source = activity_source.replace(
             "import org.libsdl.app.SDLActivity;",
-            "import android.os.Bundle;\nimport android.app.AlertDialog;\nimport org.libsdl.app.SDLActivity;",
+            "import android.os.Bundle;\nimport android.os.SystemClock;\nimport android.app.AlertDialog;\nimport org.libsdl.app.SDLActivity;",
         )
         activity_source = activity_source.replace(
             "public class FLARE extends SDLActivity {",
@@ -410,6 +410,9 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             + ("    private YandexAdsBridge yandexAds;\n" if yandex_interstitial_unit else "")
             + "    private boolean nextNetworkVk = true;\n"
             + "    private boolean currentNetworkVk = false;\n"
+            + "    private static final long AD_INTERVAL_MS = 150_000L;\n"
+            + "    private long gameStartedMs = 0L;\n"
+            + "    private long lastAdAttemptMs = 0L;\n"
             + "    @Override protected void onCreate(Bundle state) {\n"
             + "        super.onCreate(state);\n"
             + (f"        vkAds = new VkAdsBridge(this, {vk_interstitial_slot});\n" if vk_interstitial_slot else "")
@@ -438,20 +441,39 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             + '    /** Called by the native engine on entering gameplay. */\n'
             + '    public void onGameSessionStarted() {\n'
             + '        runOnUiThread(() -> {\n'
+            + '            gameStartedMs = SystemClock.elapsedRealtime();\n'
             + ("            currentNetworkVk = getSharedPreferences(\"flare_ads\", MODE_PRIVATE).getBoolean(\"next_vk\", true);\n"
                "            getSharedPreferences(\"flare_ads\", MODE_PRIVATE).edit().putBoolean(\"next_vk\", !currentNetworkVk).apply();\n"
                if vk_interstitial_slot and yandex_interstitial_unit
                else ("            currentNetworkVk = true;\n" if vk_interstitial_slot else "            currentNetworkVk = false;\n"))
-            + ('            if (currentNetworkVk && vkAds != null) vkAds.onGameSessionStarted();\n' if vk_interstitial_slot else "")
-            + ('            if (!currentNetworkVk && yandexAds != null) yandexAds.onGameSessionStarted();\n' if yandex_interstitial_unit else "")
             + '        });\n'
             + '    }\n'
-            + '    /** No more than one network may show after a saved session. */\n'
+            + '    /** Exit to title after saving ends this gameplay session. */\n'
             + '    public void onGameSessionEnded() {\n'
             + '        runOnUiThread(() -> {\n'
-            + ('            if (currentNetworkVk && vkAds != null) vkAds.onGameSessionEnded();\n' if vk_interstitial_slot else "")
-            + ('            if (!currentNetworkVk && yandexAds != null) yandexAds.onGameSessionEnded();\n' if yandex_interstitial_unit else "")
+            + '            tryShowAdAtBreak();\n'
+            + '            gameStartedMs = 0L;\n'
             + '        });\n'
+            + '    }\n'
+            + '    /** A safe break: completed map change or death/respawn screen. */\n'
+            + '    public void onGameAdBreak() {\n'
+            + '        runOnUiThread(this::tryShowAdAtBreak);\n'
+            + '    }\n'
+            + '    private void tryShowAdAtBreak() {\n'
+            + '        long now = SystemClock.elapsedRealtime();\n'
+            + '        if (gameStartedMs == 0L || now - gameStartedMs < AD_INTERVAL_MS) return;\n'
+            + '        if (lastAdAttemptMs != 0L && now - lastAdAttemptMs < AD_INTERVAL_MS) return;\n'
+            + '        android.content.SharedPreferences prefs = getSharedPreferences("flare_ads", MODE_PRIVATE);\n'
+            + '        long wallNow = System.currentTimeMillis();\n'
+            + '        long lastWall = prefs.getLong("last_ad_wall_ms", 0L);\n'
+            + '        if (lastWall != 0L && (wallNow < lastWall || wallNow - lastWall < AD_INTERVAL_MS)) return;\n'
+            + '        boolean attempted = false;\n'
+            + ('        if (currentNetworkVk && vkAds != null) attempted = vkAds.showIfReady();\n' if vk_interstitial_slot else "")
+            + ('        if (!currentNetworkVk && yandexAds != null) attempted = yandexAds.showIfReady();\n' if yandex_interstitial_unit else "")
+            + '        if (attempted) {\n'
+            + '            lastAdAttemptMs = now;\n'
+            + '            prefs.edit().putLong("last_ad_wall_ms", wallNow).apply();\n'
+            + '        }\n'
             + '    }\n',
             1,
         )
@@ -483,6 +505,21 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         encoding="utf-8",
     )
 
+    # A change to ad mode must restore the original source and its header.
+    gameplay_header = engine / "src/GameStatePlay.h"
+    header_content = gameplay_header.read_text(encoding="utf-8")
+    header_ads = "#ifdef __ANDROID__\n\tbool ads_death_notified;\n\tbool ads_seen_first_map;\n#endif\n"
+    if header_ads in header_content:
+        header_content = header_content.replace(header_ads, "")
+    if ads_enabled:
+        if header_content.count("\tbool is_first_map_load;\n") != 1:
+            raise ValueError("Cannot find first-map flag in native GameStatePlay header")
+        header_content = header_content.replace(
+            "\tbool is_first_map_load;\n",
+            "\tbool is_first_map_load;\n" + header_ads,
+        )
+    gameplay_header.write_text(header_content, encoding="utf-8")
+
     # Revert only the exact location of our previously injected native callback.
     # This makes repeated preparation and ad-on -> ad-off -> ad-on safe.
     gameplay = engine / "src/GameStatePlay.cpp"
@@ -501,6 +538,32 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         gameplay_source = gameplay_source[:start] + gameplay_source[stop:]
     elif stop_marker in gameplay_source:
         raise ValueError("Incomplete VK session start hook")
+
+    # Clear our additional safe-break hooks before re-generating them.
+    for event in ("map", "death"):
+        start_marker = "// FlareAds " + event + " break begin\n"
+        stop_marker = "// FlareAds " + event + " break end\n"
+        if start_marker in gameplay_source:
+            if gameplay_source.count(start_marker) != 1 or gameplay_source.count(stop_marker) != 1:
+                raise ValueError("Malformed FlareAds " + event + " break hook")
+            start = gameplay_source.index(start_marker)
+            stop = gameplay_source.index(stop_marker, start) + len(stop_marker)
+            gameplay_source = gameplay_source[:start] + gameplay_source[stop:]
+        elif stop_marker in gameplay_source:
+            raise ValueError("Incomplete FlareAds " + event + " break hook")
+
+    ad_initializer = "\t, ads_death_notified(false)\n\t, ads_seen_first_map(false)\n"
+    gameplay_source = gameplay_source.replace(ad_initializer, "")
+    native_bridge_begin = "// FlareAds native bridge begin\n"
+    native_bridge_end = "// FlareAds native bridge end\n"
+    if native_bridge_begin in gameplay_source:
+        if gameplay_source.count(native_bridge_begin) != 1 or gameplay_source.count(native_bridge_end) != 1:
+            raise ValueError("Malformed native FlareAds bridge")
+        start = gameplay_source.index(native_bridge_begin)
+        stop = gameplay_source.index(native_bridge_end, start) + len(native_bridge_end)
+        gameplay_source = gameplay_source[:start] + gameplay_source[stop:]
+    elif native_bridge_end in gameplay_source:
+        raise ValueError("Incomplete native FlareAds bridge")
 
     ad_begin = '\t\tsetRequestedGameState(new GameStateTitle());\n#ifdef __ANDROID__\n'
     ad_end = '\n#endif\n\n\t\tsave_load->setGameSlot(0);'
@@ -579,6 +642,72 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "\n\t\tsave_load->setGameSlot(0);"
         )
         gameplay_source = gameplay_source.replace(exit_anchor, android_ad_call)
+        # Two native safe-break events in addition to saved exit-to-menu.
+        # Initial map load and chained on-load teleports are not ad breaks.
+        constructor = "\t, is_first_map_load(true)\n"
+        if gameplay_source.count(constructor) != 1:
+            raise ValueError("Cannot initialize FlareAds session flags")
+        gameplay_source = gameplay_source.replace(
+            constructor, constructor + ad_initializer
+        )
+        death_anchor = (
+            "\t// close menus when the player dies, but still allow them to be reopened\n"
+            "\tif (pc->close_menus) {"
+        )
+        if gameplay_source.count(death_anchor) != 1:
+            raise ValueError("Cannot locate game-death transition")
+        death_hook = (
+            "// FlareAds death break begin\n"
+            "#ifdef __ANDROID__\n"
+            "\tif (pc->stats.alive) ads_death_notified = false;\n"
+            "\telse if (!ads_death_notified && pc->stats.cur_state == StatBlock::ENTITY_DEAD) {\n"
+            "\t\tads_death_notified = true;\n"
+            "\t\tflareRequestAdBreak();\n"
+            "\t}\n"
+            "#endif\n"
+            "// FlareAds death break end\n"
+        )
+        gameplay_source = gameplay_source.replace(death_anchor, death_hook + death_anchor)
+        map_anchor = (
+            "\t\t}\n\n"
+            "\t\tif (mapr->collider.isOutsideMap(pc->stats.pos.x, pc->stats.pos.y)) {"
+        )
+        if gameplay_source.count(map_anchor) != 1:
+            raise ValueError("Cannot locate completed intermap teleport")
+        map_hook = (
+            "// FlareAds map break begin\n"
+            "#ifdef __ANDROID__\n"
+            "\t\t\tif (ads_seen_first_map && !on_load_teleport && pc->stats.alive) {\n"
+            "\t\t\t\tflareRequestAdBreak();\n"
+            "\t\t\t}\n"
+            "\t\t\tads_seen_first_map = true;\n"
+            "#endif\n"
+            "// FlareAds map break end\n"
+        )
+        gameplay_source = gameplay_source.replace(
+            map_anchor,
+            map_hook + map_anchor,
+        )
+        native_bridge = (
+            "// FlareAds native bridge begin\n"
+            "#ifdef __ANDROID__\n"
+            "static void flareRequestAdBreak() {\n"
+            "\tJNIEnv* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());\n"
+            "\tif (!env) return;\n"
+            "\tjobject activity = static_cast<jobject>(SDL_AndroidGetActivity());\n"
+            "\tif (!activity) return;\n"
+            "\tjclass clazz = env->GetObjectClass(activity);\n"
+            "\tif (clazz) {\n"
+            "\t\tjmethodID method = env->GetMethodID(clazz, \"onGameAdBreak\", \"()V\");\n"
+            "\t\tif (method) env->CallVoidMethod(activity, method);\n"
+            "\t\tenv->DeleteLocalRef(clazz);\n"
+            "\t}\n"
+            "\tenv->DeleteLocalRef(activity);\n"
+            "}\n"
+            "#endif\n"
+            "// FlareAds native bridge end\n"
+        )
+        gameplay_source = native_bridge + gameplay_source
         gameplay_source = native_header + gameplay_source
 
     gameplay.write_text(gameplay_source, encoding="utf-8")

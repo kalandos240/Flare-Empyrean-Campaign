@@ -1,6 +1,5 @@
 package org.flare.app;
 
-import android.os.SystemClock;
 import android.util.Log;
 
 
@@ -21,21 +20,17 @@ import com.yandex.mobile.ads.interstitial.InterstitialAdLoader;
  * AUTOMATIC_SDK_INITIALIZATION=false in the manifest: do not start requests
  * (or manual SDK initialization) before the consent screen.
  *
- * Ads are eligible only once a native session was saved and returned to title.
- * This is mutually exclusive with the VK bridge in any single session.
+ * The Activity enforces consent, first-play delay and one shared 150-second
+ * cooldown across all safe-break events and advertising networks.
  */
 final class YandexAdsBridge {
     private static final String TAG = "FlareYandexAds";
-    private static final long MIN_SESSION_AGE_MS = 3L * 60 * 1000;
-    private static final long MIN_BETWEEN_ADS_MS = 4L * 60 * 1000;
 
     private final FLARE activity;
     private final String adUnitId;
     private InterstitialAdLoader loader;
     private InterstitialAd pendingAd;
     private boolean privacyReady = false;
-    private long sessionStartedAt = 0L;
-    private long lastShownAt = 0L;
 
     YandexAdsBridge(FLARE activity, String adUnitId) {
         this.activity = activity;
@@ -63,23 +58,15 @@ final class YandexAdsBridge {
         }
     }
 
-    void onGameSessionStarted() {
-        sessionStartedAt = SystemClock.elapsedRealtime();
-    }
-
-    void onGameSessionEnded() {
-        long started = sessionStartedAt;
-        sessionStartedAt = 0L;
-        long now = SystemClock.elapsedRealtime();
-        if (!privacyReady || started == 0L || now - started < MIN_SESSION_AGE_MS ||
-                (lastShownAt != 0L && now - lastShownAt < MIN_BETWEEN_ADS_MS) ||
-                pendingAd == null) return;
+    /** Show only when preloaded; never block loading, game progress or saves. */
+    boolean showIfReady() {
+        if (!privacyReady || pendingAd == null) return false;
 
         final InterstitialAd ad = pendingAd;
         pendingAd = null;
         ad.setAdEventListener(new InterstitialAdEventListener() {
             @Override public void onAdShown() {
-                Log.i(TAG, "Interstitial displayed at a saved-game break");
+                Log.i(TAG, "Interstitial displayed at a safe game break");
             }
             @Override public void onAdFailedToShow(AdError error) {
                 cleanup(ad);
@@ -94,11 +81,12 @@ final class YandexAdsBridge {
         });
         try {
             ad.show(activity);
-            lastShownAt = now;
+            return true;
         } catch (RuntimeException error) {
             Log.w(TAG, "Interstitial could not open; gameplay continues", error);
             cleanup(ad);
             loadNext();
+            return false;
         }
     }
 
