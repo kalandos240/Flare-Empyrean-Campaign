@@ -130,7 +130,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn(PACKAGE_ID, (app / "build.gradle").read_text())
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
             self.assertIn("minSdk 26", (app / "build.gradle").read_text())
-            self.assertIn("versionCode 5", (app / "build.gradle").read_text())
+            self.assertIn("versionCode 6", (app / "build.gradle").read_text())
             self.assertIn("versionName '0.2.3'", (app / "build.gradle").read_text())
             self.assertIn("FLARE_RELEASE_KEYSTORE_PATH", (app / "build.gradle").read_text())
             self.assertIn("FLARE_RELEASE_KEYSTORE_PASSWORD", (app / "build.gradle").read_text())
