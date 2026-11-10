@@ -205,7 +205,9 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
             self.assertNotIn("FlareAds", (engine / "src/GameStatePlay.cpp").read_text())
             self.assertNotIn("ads_seen_first_map", (engine / "src/GameStatePlay.h").read_text())
+            self.assertNotIn("ads_pause_notified", (engine / "src/GameStatePlay.h").read_text())
             self.assertNotIn("onGameSessionStarted", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("FlareAds pause break begin", (engine / "src/GameStatePlay.cpp").read_text())
 
             with ZipFile(app / "src/main/assets/campaign.zip") as archive:
                 paths = set(archive.namelist())
@@ -242,12 +244,15 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn('GetMethodID(vk_class, "onGameSessionStarted", "()V")', cpp)
             self.assertIn("onGameSessionStarted", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("onGameAdBreak", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
-            self.assertIn("AD_INTERVAL_MS = 150_000L", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
+            self.assertIn("AD_INTERVAL_MS = 120_000L", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn('getLong("last_ad_wall_ms", 0L)', (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("showIfReady()", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("ads_death_notified", (engine / "src/GameStatePlay.h").read_text())
             self.assertIn("ads_seen_first_map", (engine / "src/GameStatePlay.h").read_text())
-            self.assertEqual((engine / "src/GameStatePlay.cpp").read_text().count("flareRequestAdBreak();"), 2)
+            self.assertIn("ads_pause_notified", (engine / "src/GameStatePlay.h").read_text())
+            self.assertIn("// FlareAds pause break begin", cpp)
+            self.assertIn("if (!menu->exit->visible) ads_pause_notified = false;", cpp)
+            self.assertEqual((engine / "src/GameStatePlay.cpp").read_text().count("flareRequestAdBreak();"), 3)
             self.assertIn("save_load->setGameSlot(0);", cpp)
             self.assertIn("setPrivacyReady", (app / "src/main/java/org/flare/app/VkAdsBridge.java").read_text())
             vk_activity = (app / "src/main/java/org/flare/app/FLARE.java").read_text()
@@ -267,7 +272,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertEqual(cpp.count('GetMethodID(vk_class, "onGameSessionStarted", "()V")'), 1)
             self.assertEqual(cpp.count("// FlareAds death break begin"), 1)
             self.assertEqual(cpp.count("// FlareAds map break begin"), 1)
-            self.assertEqual(cpp.count("flareRequestAdBreak();"), 2)
+            self.assertEqual(cpp.count("// FlareAds pause break begin"), 1)
+            self.assertEqual(cpp.count("flareRequestAdBreak();"), 3)
             self.assertEqual(cpp.count('#include "SDL_system.h"'), 1)
 
             # Most importantly, turning ads OFF must restore the offline build.
@@ -278,6 +284,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
             self.assertNotIn("VkAdsBridge", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("FlareAds pause break begin", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("ads_pause_notified", (engine / "src/GameStatePlay.h").read_text())
             self.assertNotIn("onGameSessionStarted", (engine / "src/GameStatePlay.cpp").read_text())
             self.assertNotIn('#include "SDL_system.h"', (engine / "src/GameStatePlay.cpp").read_text())
 
