@@ -92,10 +92,11 @@ jobs:
 
       - name: Verify active Yandex interstitial integration
         run: |
-          grep -Fq 'mobileads:8.5.0' upstream/flare-engine/flare-android-project/app/build.gradle
+          grep -Fq 'mobileads:8.6.0' upstream/flare-engine/flare-android-project/app/build.gradle
           grep -Fq 'R-M-20327058-1' upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/FLARE.java
-          grep -Fq '150_000L' upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/FLARE.java
+          grep -Fq '120_000L' upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/FLARE.java
           grep -Fq 'onGameAdBreak' upstream/flare-engine/src/GameStatePlay.cpp
+          grep -Fq 'FlareAds pause break begin' upstream/flare-engine/src/GameStatePlay.cpp
           grep -Fq 'com.yandex.mobile.ads.AUTOMATIC_SDK_INITIALIZATION' upstream/flare-engine/flare-android-project/app/src/main/AndroidManifest.xml
 
       - name: Verify launcher and storefront icon assets
@@ -176,7 +177,7 @@ jobs:
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
               --title "Flare: Empyrean Campaign 0.2.3 — Android APK" \
-              --notes "Android 8.0+ ARM debug APK. Touch fixes: separate joystick/quickslot fingers, correctly assigned Attack (MAIN1) and Skill (MAIN2), a tighter three-button group positioned above the potion bar; touch controls pause while game menus are open. Developer/debug signature only, not a signed RuStore package. Includes opt-in Yandex interstitials (R-M-20327058-1) on safe gameplay breaks, with a shared 150-second cooldown. Test before publishing."
+              --notes "Android 8.0+ ARM debug APK. Touch fixes: separate joystick/quickslot fingers, correctly assigned Attack (MAIN1) and Skill (MAIN2), a tighter three-button group positioned above the potion bar; touch controls pause while game menus are open. Developer/debug signature only, not a signed RuStore package. Includes opt-in Yandex interstitials (R-M-20327058-1) on safe gameplay breaks, with a shared 120-second cooldown. Test before publishing."
           fi
           for attempt in 1 2 3; do
             if gh release upload "$TAG" \
