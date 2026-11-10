@@ -162,29 +162,29 @@ jobs:
           grep -q '^assets/campaign-info.properties$' "$RUNNER_TEMP/flare-apk-entries.txt"
           grep -q '^base/assets/campaign.zip$' "$RUNNER_TEMP/flare-aab-entries.txt"
 
-      - name: Publish direct-install Android 0.2.3 APK
+      - name: Publish direct-install Android 0.2.4 APK
         if: github.ref == 'refs/heads/port/rustore-android-foundation'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="android-v0.2.3-debug"
+          TAG="android-v0.2.4-debug"
           APK="upstream/flare-engine/flare-android-project/app/build/outputs/apk/debug/app-debug.apk"
-          cp "$APK" "$RUNNER_TEMP/flare-empyrean-0.2.3-debug.apk"
-          sha256sum "$RUNNER_TEMP/flare-empyrean-0.2.3-debug.apk" > "$RUNNER_TEMP/flare-empyrean-0.2.3-debug.apk.sha256"
+          cp "$APK" "$RUNNER_TEMP/flare-empyrean-0.2.4-debug.apk"
+          sha256sum "$RUNNER_TEMP/flare-empyrean-0.2.4-debug.apk" > "$RUNNER_TEMP/flare-empyrean-0.2.4-debug.apk.sha256"
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title "Flare: Empyrean Campaign 0.2.3 — Android APK" \
+              --title "Flare: Empyrean Campaign 0.2.4 — Android APK" \
               --notes "Android 8.0+ ARM debug APK. Touch fixes: separate joystick/quickslot fingers, correctly assigned Attack (MAIN1) and Skill (MAIN2), a tighter three-button group positioned above the potion bar; touch controls pause while game menus are open. Developer/debug signature only, not a signed RuStore package. Includes opt-in Yandex interstitials (R-M-20327058-1) on safe gameplay breaks, with a shared 120-second cooldown. Test before publishing."
           fi
           for attempt in 1 2 3; do
             if gh release upload "$TAG" \
-              "$RUNNER_TEMP/flare-empyrean-0.2.3-debug.apk" \
-              "$RUNNER_TEMP/flare-empyrean-0.2.3-debug.apk.sha256" \
+              "$RUNNER_TEMP/flare-empyrean-0.2.4-debug.apk" \
+              "$RUNNER_TEMP/flare-empyrean-0.2.4-debug.apk.sha256" \
               --repo "$GITHUB_REPOSITORY" --clobber; then
-              echo "Direct APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/flare-empyrean-0.2.3-debug.apk"
+              echo "Direct APK: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/flare-empyrean-0.2.4-debug.apk"
               exit 0
             fi
             sleep 10
@@ -220,17 +220,17 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "name='com.kalandos240.flareempyrean'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "versionCode='5'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -q "versionCode='6'"
           unzip -Z1 "$APK" | grep -Fqx 'assets/campaign.zip'
-          NAME='flare-empyrean-0.2.3-rustore-signed.apk'
+          NAME='flare-empyrean-0.2.4-rustore-signed.apk'
           cp "$APK" "$RUNNER_TEMP/$NAME"
           (cd "$RUNNER_TEMP" && sha256sum "$NAME" > "$NAME.sha256")
-          TAG='android-v0.2.3-rustore-signed'
+          TAG='android-v0.2.4-rustore-signed'
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --prerelease \
-              --title 'Flare: Empyrean Campaign 0.2.3 — publisher-signed RuStore APK' \
-              --notes 'Android 8.0+ publisher-signed APK (versionCode 5). Uses publisher keystore from GitHub Actions Secrets. Includes Yandex Mobile Ads interstitials behind explicit consent. Verify privacy policy, runtime behaviour and publisher signing certificate before RuStore upload.'
+              --title 'Flare: Empyrean Campaign 0.2.4 — publisher-signed RuStore APK' \
+              --notes 'Android 8.0+ publisher-signed APK (versionCode 6). Uses publisher keystore from GitHub Actions Secrets. Includes Yandex Mobile Ads interstitials behind explicit consent. Verify privacy policy, runtime behaviour and publisher signing certificate before RuStore upload.'
           fi
           ICON='flare-engine/flare-android-project/rustore-icon-512.png'
           for attempt in 1 2 3; do
