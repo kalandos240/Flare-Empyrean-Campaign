@@ -24,7 +24,7 @@ two pinned upstream revisions and creates an Android app from them:
 - Configures app identifier `com.kalandos240.flareempyrean`, Android 8.0+ (min API 26) and target API 35.
 - Uses the original Russian localization and gameplay, with an Android-specific **floating** left joystick, clearly labeled **«Атаковать»** (native MAIN2), **«Использовать»** (native ACCEPT: speak, pick up, use), and **«Навык»** (assignable native MAIN1 power slot 10) rings. Input is tracked by individual fingers so movement and attacks can overlap.
 - Includes automated Python packaging tests and an Android GitHub Actions build.
-- Supports **opt-in Yandex Mobile Ads SDK 8.5.0** with real interstitial unit `R-M-20327058-1` in the Android 0.2.3 build. Ads can appear on saved exit-to-title, player death, or a completed non-initial map transition, subject to explicit consent and a shared 150-second minimum interval. The optional VK build path remains available; older published APKs are unchanged.
+- Supports **opt-in Yandex Mobile Ads SDK 8.6.0** with real interstitial unit `R-M-20327058-1` in the Android 0.2.3 build. Ads can appear on saved exit-to-title, opening the exit/settings pause menu, player death, or a completed non-initial map transition, subject to explicit consent and a shared 120-second minimum interval. The optional VK build path remains available; older published APKs are unchanged.
 
 **Status:** Preliminary native Android port. The APK/AAB build and on-device gameplay
 must pass testing before any submission to RuStore; a CI artifact is *not* a signed store release.
