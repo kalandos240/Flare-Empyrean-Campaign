@@ -62,7 +62,8 @@ class PrepareAndroidTests(unittest.TestCase):
                 "\t, is_first_map_load(true)\n"
                 "\tsecond_timer.setDuration(settings->max_frames_per_sec);\n"
                 "\t\t}\n\n"
-                "\t\tif (mapr->collider.isOutsideMap(pc->stats.pos.x, pc->stats.pos.y)) {\n"
+                "\t\tif (mapr->collider.isOutsideMap(pc->stats.pos.x, pc->stats.pos.y)) {\n"                "\tmenu->logic();\n"
+
                 "\t// close menus when the player dies, but still allow them to be reopened\n"
                 "\tif (pc->close_menus) {\n"
                 "\t\tsnd->stopMusic();\n"
@@ -130,8 +131,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn(PACKAGE_ID, (app / "build.gradle").read_text())
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
             self.assertIn("minSdk 26", (app / "build.gradle").read_text())
-            self.assertIn("versionCode 5", (app / "build.gradle").read_text())
-            self.assertIn("versionName '0.2.3'", (app / "build.gradle").read_text())
+            self.assertIn("versionCode 6", (app / "build.gradle").read_text())
+            self.assertIn("versionName '0.2.4'", (app / "build.gradle").read_text())
             self.assertIn("FLARE_RELEASE_KEYSTORE_PATH", (app / "build.gradle").read_text())
             self.assertIn("FLARE_RELEASE_KEYSTORE_PASSWORD", (app / "build.gradle").read_text())
             self.assertIn("keyAlias 'flare'", (app / "build.gradle").read_text())
@@ -205,7 +206,9 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
             self.assertNotIn("FlareAds", (engine / "src/GameStatePlay.cpp").read_text())
             self.assertNotIn("ads_seen_first_map", (engine / "src/GameStatePlay.h").read_text())
+            self.assertNotIn("ads_pause_notified", (engine / "src/GameStatePlay.h").read_text())
             self.assertNotIn("onGameSessionStarted", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("FlareAds pause break begin", (engine / "src/GameStatePlay.cpp").read_text())
 
             with ZipFile(app / "src/main/assets/campaign.zip") as archive:
                 paths = set(archive.namelist())
@@ -242,12 +245,15 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn('GetMethodID(vk_class, "onGameSessionStarted", "()V")', cpp)
             self.assertIn("onGameSessionStarted", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("onGameAdBreak", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
-            self.assertIn("AD_INTERVAL_MS = 150_000L", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
+            self.assertIn("AD_INTERVAL_MS = 120_000L", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn('getLong("last_ad_wall_ms", 0L)', (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("showIfReady()", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertIn("ads_death_notified", (engine / "src/GameStatePlay.h").read_text())
             self.assertIn("ads_seen_first_map", (engine / "src/GameStatePlay.h").read_text())
-            self.assertEqual((engine / "src/GameStatePlay.cpp").read_text().count("flareRequestAdBreak();"), 2)
+            self.assertIn("ads_pause_notified", (engine / "src/GameStatePlay.h").read_text())
+            self.assertIn("// FlareAds pause break begin", cpp)
+            self.assertIn("if (!menu->exit->visible) ads_pause_notified = false;", cpp)
+            self.assertEqual((engine / "src/GameStatePlay.cpp").read_text().count("flareRequestAdBreak();"), 3)
             self.assertIn("save_load->setGameSlot(0);", cpp)
             self.assertIn("setPrivacyReady", (app / "src/main/java/org/flare/app/VkAdsBridge.java").read_text())
             vk_activity = (app / "src/main/java/org/flare/app/FLARE.java").read_text()
@@ -267,7 +273,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertEqual(cpp.count('GetMethodID(vk_class, "onGameSessionStarted", "()V")'), 1)
             self.assertEqual(cpp.count("// FlareAds death break begin"), 1)
             self.assertEqual(cpp.count("// FlareAds map break begin"), 1)
-            self.assertEqual(cpp.count("flareRequestAdBreak();"), 2)
+            self.assertEqual(cpp.count("// FlareAds pause break begin"), 1)
+            self.assertEqual(cpp.count("flareRequestAdBreak();"), 3)
             self.assertEqual(cpp.count('#include "SDL_system.h"'), 1)
 
             # Most importantly, turning ads OFF must restore the offline build.
@@ -278,6 +285,8 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
             self.assertNotIn("VkAdsBridge", (app / "src/main/java/org/flare/app/FLARE.java").read_text())
             self.assertNotIn("onGameSessionEnded", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("FlareAds pause break begin", (engine / "src/GameStatePlay.cpp").read_text())
+            self.assertNotIn("ads_pause_notified", (engine / "src/GameStatePlay.h").read_text())
             self.assertNotIn("onGameSessionStarted", (engine / "src/GameStatePlay.cpp").read_text())
             self.assertNotIn('#include "SDL_system.h"', (engine / "src/GameStatePlay.cpp").read_text())
 
@@ -304,7 +313,7 @@ class PrepareAndroidTests(unittest.TestCase):
             yandex = app / "src/main/java/org/flare/app/YandexAdsBridge.java"
             self.assertTrue(yandex.exists())
             self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
-            self.assertIn("com.yandex.android:mobileads:8.5.0", (app / "build.gradle").read_text())
+            self.assertIn("com.yandex.android:mobileads:8.6.0", (app / "build.gradle").read_text())
             self.assertNotIn("mytarget-sdk", (app / "build.gradle").read_text())
             self.assertIn("android.useAndroidX=true", (engine / "flare-android-project/gradle.properties").read_text())
             yandex_manifest = (app / "src/main/AndroidManifest.xml").read_text()
@@ -336,7 +345,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn('setTitle("Реклама VK и Яндекса: конфиденциальность")', combined_activity)
             combined_gradle = (app / "build.gradle").read_text()
             self.assertIn("mytarget-sdk:5.52.5", combined_gradle)
-            self.assertIn("mobileads:8.5.0", combined_gradle)
+            self.assertIn("mobileads:8.6.0", combined_gradle)
             ET.fromstring((app / "src/main/AndroidManifest.xml").read_text())
             native = (engine / "src/GameStatePlay.cpp").read_text()
             self.assertEqual(native.count('GetMethodID(clazz, "onGameSessionEnded", "()V")'), 1)

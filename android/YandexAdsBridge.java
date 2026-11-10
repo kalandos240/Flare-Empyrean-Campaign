@@ -20,7 +20,7 @@ import com.yandex.mobile.ads.interstitial.InterstitialAdLoader;
  * AUTOMATIC_SDK_INITIALIZATION=false in the manifest: do not start requests
  * (or manual SDK initialization) before the consent screen.
  *
- * The Activity enforces consent, first-play delay and one shared 150-second
+ * The Activity enforces consent, first-play delay and one shared 120-second
  * cooldown across all safe-break events and advertising networks.
  */
 final class YandexAdsBridge {

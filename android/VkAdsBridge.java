@@ -14,7 +14,7 @@ import com.my.target.common.models.IAdLoadingError;
  * calls setPrivacyReady(). No SDK object is created by the offline default build.
  *
  * The game never waits for an ad to load. The Activity selects safe break
- * events and enforces one shared 150-second cooldown for both networks.
+ * events and enforces one shared 120-second cooldown for both networks.
  */
 final class VkAdsBridge {
     private static final String TAG = "FlareVKAds";
