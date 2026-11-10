@@ -24,7 +24,7 @@ two pinned upstream revisions and creates an Android app from them:
 - Configures app identifier `com.kalandos240.flareempyrean`, Android 8.0+ (min API 26) and target API 35.
 - Uses the original Russian localization and gameplay, with an Android-specific **floating** left joystick, clearly labeled **«Атаковать»** (native MAIN2), **«Использовать»** (native ACCEPT: speak, pick up, use), and **«Навык»** (assignable native MAIN1 power slot 10) rings. Input is tracked by individual fingers so movement and attacks can overlap.
 - Includes automated Python packaging tests and an Android GitHub Actions build.
-- Supports **opt-in Yandex Mobile Ads SDK 8.6.0** with real interstitial unit `R-M-20327058-1` in the Android 0.2.3 build. Ads can appear on saved exit-to-title, opening the exit/settings pause menu, player death, or a completed non-initial map transition, subject to explicit consent and a shared 120-second minimum interval. The optional VK build path remains available; older published APKs are unchanged.
+- Supports **opt-in Yandex Mobile Ads SDK 8.6.0** with real interstitial unit `R-M-20327058-1` in the Android 0.2.4 build. Ads can appear on saved exit-to-title, opening the exit/settings pause menu, player death, or a completed non-initial map transition, subject to explicit consent and a shared 120-second minimum interval. The optional VK build path remains available; older published APKs are unchanged.
 
 **Status:** Preliminary native Android port. The APK/AAB build and on-device gameplay
 must pass testing before any submission to RuStore; a CI artifact is *not* a signed store release.
@@ -85,8 +85,8 @@ ID and signing credentials. This repository never stores signing keys in source
 control. The separate **publisher-signed RuStore APK** workflow step is enabled
 only when both `FLARE_KEYSTORE_BASE64` and `FLARE_KEYSTORE_PASSWORD` are provided
 as GitHub Actions Secrets. See [secure signing instructions](docs/RELEASE_SIGNING_RU.md).
-The output is `flare-empyrean-0.2.3-rustore-signed.apk` in a distinct prerelease;
-**do not submit `flare-empyrean-0.2.3-debug.apk` to RuStore.** A signed release,
+The output is `flare-empyrean-0.2.4-rustore-signed.apk` in a distinct prerelease;
+**do not submit `flare-empyrean-0.2.4-debug.apk` to RuStore.** A signed release,
 real-device QA (including ad delivery and dismissal), accessibility, store screenshots, privacy documentation and a
 complete license audit remain to do.
 
