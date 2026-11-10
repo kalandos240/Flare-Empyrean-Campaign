@@ -312,7 +312,7 @@ class PrepareAndroidTests(unittest.TestCase):
             yandex = app / "src/main/java/org/flare/app/YandexAdsBridge.java"
             self.assertTrue(yandex.exists())
             self.assertFalse((app / "src/main/java/org/flare/app/VkAdsBridge.java").exists())
-            self.assertIn("com.yandex.android:mobileads:8.5.0", (app / "build.gradle").read_text())
+            self.assertIn("com.yandex.android:mobileads:8.6.0", (app / "build.gradle").read_text())
             self.assertNotIn("mytarget-sdk", (app / "build.gradle").read_text())
             self.assertIn("android.useAndroidX=true", (engine / "flare-android-project/gradle.properties").read_text())
             yandex_manifest = (app / "src/main/AndroidManifest.xml").read_text()
@@ -344,7 +344,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn('setTitle("Реклама VK и Яндекса: конфиденциальность")', combined_activity)
             combined_gradle = (app / "build.gradle").read_text()
             self.assertIn("mytarget-sdk:5.52.5", combined_gradle)
-            self.assertIn("mobileads:8.5.0", combined_gradle)
+            self.assertIn("mobileads:8.6.0", combined_gradle)
             ET.fromstring((app / "src/main/AndroidManifest.xml").read_text())
             native = (engine / "src/GameStatePlay.cpp").read_text()
             self.assertEqual(native.count('GetMethodID(clazz, "onGameSessionEnded", "()V")'), 1)
