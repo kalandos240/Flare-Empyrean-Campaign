@@ -96,8 +96,10 @@ jobs:
             --abis x86_64 "${extra[@]}"
           test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/FLARE.java
           grep -q 'onGameSessionEnded' upstream/flare-engine/src/GameStatePlay.cpp
+          grep -q 'FlareAds pause break begin' upstream/flare-engine/src/GameStatePlay.cpp
+          grep -q '120_000L' upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/FLARE.java
           if [[ "${{ matrix.network }}" != vk ]]; then
-            grep -q 'mobileads:8.5.0' upstream/flare-engine/flare-android-project/app/build.gradle
+            grep -q 'mobileads:8.6.0' upstream/flare-engine/flare-android-project/app/build.gradle
             grep -q 'AUTOMATIC_SDK_INITIALIZATION' upstream/flare-engine/flare-android-project/app/src/main/AndroidManifest.xml
             test -f upstream/flare-engine/flare-android-project/app/src/main/java/org/flare/app/YandexAdsBridge.java
           fi
