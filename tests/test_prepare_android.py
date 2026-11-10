@@ -62,7 +62,8 @@ class PrepareAndroidTests(unittest.TestCase):
                 "\t, is_first_map_load(true)\n"
                 "\tsecond_timer.setDuration(settings->max_frames_per_sec);\n"
                 "\t\t}\n\n"
-                "\t\tif (mapr->collider.isOutsideMap(pc->stats.pos.x, pc->stats.pos.y)) {\n"
+                "\t\tif (mapr->collider.isOutsideMap(pc->stats.pos.x, pc->stats.pos.y)) {\n"                "\tmenu->logic();\n"
+
                 "\t// close menus when the player dies, but still allow them to be reopened\n"
                 "\tif (pc->close_menus) {\n"
                 "\t\tsnd->stopMusic();\n"
@@ -131,7 +132,7 @@ class PrepareAndroidTests(unittest.TestCase):
             self.assertIn("targetSdk 35", (app / "build.gradle").read_text())
             self.assertIn("minSdk 26", (app / "build.gradle").read_text())
             self.assertIn("versionCode 6", (app / "build.gradle").read_text())
-            self.assertIn("versionName '0.2.3'", (app / "build.gradle").read_text())
+            self.assertIn("versionName '0.2.4'", (app / "build.gradle").read_text())
             self.assertIn("FLARE_RELEASE_KEYSTORE_PATH", (app / "build.gradle").read_text())
             self.assertIn("FLARE_RELEASE_KEYSTORE_PASSWORD", (app / "build.gradle").read_text())
             self.assertIn("keyAlias 'flare'", (app / "build.gradle").read_text())
