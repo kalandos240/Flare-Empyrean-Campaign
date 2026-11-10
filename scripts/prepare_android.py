@@ -16,7 +16,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 PACKAGE_ID = "com.kalandos240.flareempyrean"
 CONTENT_VERSION = "empyrean-2026-10-11-v2"
 VK_ADS_SDK_VERSION = "5.52.5"
-YANDEX_ADS_SDK_VERSION = "8.5.0"
+YANDEX_ADS_SDK_VERSION = "8.6.0"
 
 APP_GRADLE = """plugins {
     id 'com.android.application'
@@ -410,7 +410,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             + ("    private YandexAdsBridge yandexAds;\n" if yandex_interstitial_unit else "")
             + "    private boolean nextNetworkVk = true;\n"
             + "    private boolean currentNetworkVk = false;\n"
-            + "    private static final long AD_INTERVAL_MS = 150_000L;\n"
+            + "    private static final long AD_INTERVAL_MS = 120_000L;\n"
             + "    private long gameStartedMs = 0L;\n"
             + "    private long lastAdAttemptMs = 0L;\n"
             + "    @Override protected void onCreate(Bundle state) {\n"
@@ -508,9 +508,14 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
     # A change to ad mode must restore the original source and its header.
     gameplay_header = engine / "src/GameStatePlay.h"
     header_content = gameplay_header.read_text(encoding="utf-8")
-    header_ads = "#ifdef __ANDROID__\n\tbool ads_death_notified;\n\tbool ads_seen_first_map;\n#endif\n"
-    if header_ads in header_content:
-        header_content = header_content.replace(header_ads, "")
+    legacy_header_ads = "#ifdef __ANDROID__\n\tbool ads_death_notified;\n\tbool ads_seen_first_map;\n#endif\n"
+    header_ads = legacy_header_ads.replace(
+        "\tbool ads_seen_first_map;\n",
+        "\tbool ads_seen_first_map;\n\tbool ads_pause_notified;\n",
+    )
+    for previous in (header_ads, legacy_header_ads):
+        if previous in header_content:
+            header_content = header_content.replace(previous, "")
     if ads_enabled:
         if header_content.count("\tbool is_first_map_load;\n") != 1:
             raise ValueError("Cannot find first-map flag in native GameStatePlay header")
@@ -540,7 +545,7 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         raise ValueError("Incomplete VK session start hook")
 
     # Clear our additional safe-break hooks before re-generating them.
-    for event in ("map", "death"):
+    for event in ("map", "death", "pause"):
         start_marker = "// FlareAds " + event + " break begin\n"
         stop_marker = "// FlareAds " + event + " break end\n"
         if start_marker in gameplay_source:
@@ -552,8 +557,10 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
         elif stop_marker in gameplay_source:
             raise ValueError("Incomplete FlareAds " + event + " break hook")
 
-    ad_initializer = "\t, ads_death_notified(false)\n\t, ads_seen_first_map(false)\n"
-    gameplay_source = gameplay_source.replace(ad_initializer, "")
+    legacy_ad_initializer = "\t, ads_death_notified(false)\n\t, ads_seen_first_map(false)\n"
+    ad_initializer = legacy_ad_initializer + "\t, ads_pause_notified(false)\n"
+    for previous in (ad_initializer, legacy_ad_initializer):
+        gameplay_source = gameplay_source.replace(previous, "")
     native_bridge_begin = "// FlareAds native bridge begin\n"
     native_bridge_end = "// FlareAds native bridge end\n"
     if native_bridge_begin in gameplay_source:
@@ -668,6 +675,23 @@ def prepare(engine: Path, game: Path, abis: str = "armeabi-v7a arm64-v8a", vk_in
             "// FlareAds death break end\n"
         )
         gameplay_source = gameplay_source.replace(death_anchor, death_hook + death_anchor)
+        # Opening the explicit exit/settings pause screen is a natural break.
+        # Only notify once per opening and never while the player is in combat.
+        pause_anchor = "\tmenu->logic();\n"
+        if gameplay_source.count(pause_anchor) != 1:
+            raise ValueError("Cannot locate completed pause-menu input processing")
+        pause_hook = (
+            "// FlareAds pause break begin\n"
+            "#ifdef __ANDROID__\n"
+            "\tif (!menu->exit->visible) ads_pause_notified = false;\n"
+            "\telse if (!ads_pause_notified && pc->stats.alive) {\n"
+            "\t\tads_pause_notified = true;\n"
+            "\t\tflareRequestAdBreak();\n"
+            "\t}\n"
+            "#endif\n"
+            "// FlareAds pause break end\n"
+        )
+        gameplay_source = gameplay_source.replace(pause_anchor, pause_anchor + pause_hook)
         map_anchor = (
             "\t\t}\n\n"
             "\t\tif (mapr->collider.isOutsideMap(pc->stats.pos.x, pc->stats.pos.y)) {"
